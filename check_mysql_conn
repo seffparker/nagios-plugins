@@ -1,17 +1,21 @@
 #!/bin/bash
 
 # Author: Smith, Seff
-# Version: v2.0 build 20190401
+# Version: v2.1 build 20190417
 
-DB_USER=icinga
-DB_PASS="twEWKI!d@GUoP76"
+DB_USER="user"
+DB_PASS="password"
+DB_NAME="database"
+DB_TABLE="table"
+DB_KEY="key"
+DB_VALUE="value"
 
 THREADS=0
 QPS=0
 QS_PREV_SAVE=check_mysql_conn.qs
 
 MYSQL_QUERY() {
-mysql -N  -e 'select Icinga from icinga.icinga;' -u${DB_USER} -p${DB_PASS}  
+mysql -N  -e "select ${DB_KEY} from ${DB_NAME}.${DB_TABLE};" -u${DB_USER} -p${DB_PASS}
 }
 
 if ! true &>/dev/null </dev/tcp/127.0.0.1/3306
@@ -37,7 +41,7 @@ else
 	fi
 	echo ${QS_CURR} > ${QS_PREV_SAVE}
 	DETAILS="Threads: ${THREADS}, Q/s: ${QPS}"
-	if [[ $(MYSQL_QUERY 2> /dev/null) = "DB_CONN_TEST" ]]
+	if [[ $(MYSQL_QUERY 2> /dev/null) = "${DB_VALUE}" ]]
 	then
 		STATUS="OK: MySQL ${SERVER} is UP for ${UPTIME}! ${DETAILS}"
 		EXIT=0
