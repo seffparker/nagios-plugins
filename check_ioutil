@@ -1,0 +1,103 @@
+#!/bin/bash
+
+show_version(){
+echo -e "
+Nagios/Icinga script to check and report Disk I/O utilization in percentage
+Author:  Seff Parker
+Version: v2.0 build 20190302
+"
+}
+
+
+PREV_DS_SAVE=check_ioutil.save
+WARN=90 # Default warning level
+CRIT=99 # Default critical level
+
+# Read custom options from arguments
+while getopts ":w:c:t:V" opt; do
+  case ${opt} in
+    w )
+      WARN=$OPTARG
+      ;;
+    c )
+      CRIT=$OPTARG
+      ;;
+    V )
+	show_version
+	exit 0
+      ;;
+    * )
+      echo "Usage: $0 [-w Warning] [-c Critical]"
+      exit 3
+      ;;
+  esac
+done
+shift $((OPTIND -1))
+
+if [ $WARN -gt $CRIT ]
+	then
+	STATUS="UNKNOWN: Warning level should be lower than critical"
+	EXIT=3
+elif [ ! -f $PREV_DS_SAVE ]
+	then
+	STATUS="UNKNOWN: Polling started"
+	EXIT=3
+elif [ ! -s $PREV_DS_SAVE ]
+	then
+	STATUS="UNKNOWN: Cannot read disk stats from Kernel"
+	EXIT=3
+else
+	CURR_DS=$(cat /proc/diskstats 2> /dev/null)
+	PREV_DS=$(cat $PREV_DS_SAVE)
+	CURR_LC=$(echo "$CURR_DS" | wc -l)
+	CURR_CC=$(echo "$CURR_DS" | wc -c)
+	PREV_LC=$(echo "$PREV_DS" | wc -l)
+	PREV_CC=$(echo "$PREV_DS" | wc -c)
+	if [[ $CURR_LC -ne $PREV_LC || $CURR_CC -lt $PREV_CC ]]
+		then
+		STATUS="UNKNOWN: Re-polling started"
+		EXIT=3
+	else
+	CURR_TS=$(date +%s)
+	PREV_TS=$(date -r $PREV_DS_SAVE +%s)
+	let POLL_TIME="($CURR_TS - $PREV_TS)"
+
+	DISKS=($(echo "$PREV_DS" | awk '!/loop/ && !/ram/ && !/sr/ && !/fd/ {print $3}'))
+	MS_BEGIN=($(echo "$PREV_DS" | awk '!/loop/ && !/ram/ && !/sr/ && !/fd/ {print $13}'))
+	MS_END=($(echo "$CURR_DS" | awk '!/loop/ && !/ram/ && !/sr/ && !/fd/ {print $13}'))
+	DISK_NOS=${#DISKS[*]}
+
+	# Debug:
+	# echo "Arguments: -w $WARN -c $CRIT -t $POLL_TIME"
+	# echo "Number of disks: $DISK_NOS"
+	# echo "Disks: ${DISKS[*]}"
+	# echo "ms begin: ${MS_BEGIN[*]}"
+	# echo "ms end:   ${MS_END[*]}"
+
+	for ((i=0; i<$DISK_NOS; i++))
+	do
+	   let UTIL[$i]=("${MS_END[$i]}" - "${MS_BEGIN[$i]}")/${POLL_TIME}0
+	   SHOW_UTIL[$i]="${DISKS[$i]}: ${UTIL[$i]}%,"
+	   PERF_DATA[$i]="'${DISKS[$i]}'=${UTIL[$i]}%;$WARN;$CRIT;;"
+	   [ ${UTIL[$i]} -ge $CRIT ] && CRITICAL=true
+	   [ ${UTIL[$i]} -ge $WARN ] && WARNING=true
+	done
+	STATS="${SHOW_UTIL[*]}| ${PERF_DATA[*]}"
+	if [ $CRITICAL ]
+		then
+		STATUS="CRITICAL: Disk I/O Usage is very high! - "
+		EXIT=2
+	elif [ $WARNING ]
+		then
+		STATUS="WARNING: Disk I/O Usage is increasing! - "
+		EXIT=1
+	else
+		STATUS="OK: Disk I/O usage is normal! - "
+		EXIT=0
+	fi
+	fi
+fi
+
+cat /proc/diskstats 2> /dev/null > $PREV_DS_SAVE
+echo "${STATUS}${STATS}"
+exit $EXIT

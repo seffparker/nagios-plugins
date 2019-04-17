@@ -1,0 +1,55 @@
+#!/bin/bash
+
+## Nagios/Icinga plugin to check package database integrity
+
+## Author: Seff Parker
+## Version: 20190330
+
+if which rpm &> /dev/null
+        then
+        RPM_VERIFY=$(/usr/lib/rpm/rpmdb_verify /var/lib/rpm/Packages)
+        EXIT=$?
+        if [[ $EXIT = 0 ]]
+                then
+                LAST_PKG_UPED=$(rpm -qa --last | head -1 | awk '{$1=""; print $0}')
+                LAST_PKG_UPED_TS=$(date -d "$LAST_PKG_UPED" +%s)
+                CURRENT_TS=$(date +%s)
+                let LAST_PKG_UPED_AGO=$CURRENT_TS-$LAST_PKG_UPED_TS
+                if [[ ${LAST_PKG_UPED_AGO} -gt 5184000 ]]
+                        then
+                        STATUS="WARNING: Packages are not updated for last 60 days"
+                        EXIT=1
+                else
+                        STATUS="OK: RPM Database verification succeeded"
+                fi
+        else
+                STATUS="CRITICAL: $RPM_VERIFY"
+                EXIT=2
+        fi
+elif which dpkg &> /dev/null
+	then
+	DPKG_VERIFY=$(dpkg --audit)
+	EXIT=$?
+	if [[ $EXIT = 0 ]]
+		then
+		LAST_PKG_UPED_TS=$(date -r /var/lib/dpkg/status +%s)
+		CURRENT_TS=$(date +%s)
+		let LAST_PKG_UPED_AGO=$CURRENT_TS-$LAST_PKG_UPED_TS
+		if [[ ${LAST_PKG_UPED_AGO} -gt 5184000 ]]
+			then
+			STATUS="WARNING: Packages are not updated for last 60 days"
+			EXIT=1
+		else
+			STATUS="OK: DPKG Database verification succeeded"
+		fi
+	else
+		STATUS="CRITICAL: $DPKG_VERIFY"
+		EXIT=2
+	fi
+else
+        STATUS="UNKNOWN: Couldn't fetch package information"
+        EXIT=3
+fi
+
+echo $STATUS
+exit $EXIT

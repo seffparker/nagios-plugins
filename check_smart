@@ -1,0 +1,107 @@
+#!/bin/bash
+
+show_version(){
+echo -e "
+Nagios/Icinga script to check S.M.A.R.T. health status of physical disks
+Author:  Seff Parker
+Version: v1.2 build 20181212
+"
+}
+
+CMD="sudo /usr/sbin/smartctl"
+RAID_TYPE="auto"
+DEVICE_IDS="auto"
+
+# Read options from arguments
+while getopts ":t:i:V" opt; do
+  case ${opt} in
+    t )
+	RAID_TYPE=$OPTARG
+	;;
+    i )
+	DEVICE_IDS=$OPTARG
+	;;
+    V )
+        show_version
+        exit 3
+	;;
+    * )
+	echo "Usage: $0 [-t sat+megaraid|auto] [-i 5,7|auto]"
+	exit 3
+	;;
+  esac
+done
+shift $((OPTIND -1))
+
+SCAN=$($CMD --scan 2>&1)
+DRIVES=$(echo "$SCAN" | awk '/sd/ {print $1}')
+if [ "$RAID_TYPE" == "auto" ]
+	then
+	RAID_ARRAYS=$(echo "$SCAN" | awk '/bus/ {print $3}')
+else
+	DEVICE_IDS=$(echo "$DEVICE_IDS" | sed 's|,| |g')
+	RAID_ARRAYS=$(for DEVICE_ID in $DEVICE_IDS
+	do
+		echo "${RAID_TYPE},${DEVICE_ID}"
+	done)
+fi
+
+if [ -z "$SCAN" ]
+	then
+	STATUS="UNKNOWN: No physical drives detected!"
+	EXIT=3
+elif [ -z "$RAID_ARRAYS" ]
+	then
+	SMART=$(for DRIVE in $DRIVES
+        do
+		$CMD -t short --offlineauto=on -a $DRIVE
+	done)
+else
+	SMART=$(for DRIVE in $DRIVES
+		do
+		for RAID_ARRAY in $RAID_ARRAYS
+		do
+		 $CMD -t short --offlineauto=on -a -d $RAID_ARRAY ${DRIVE}
+		done
+	done)
+fi
+
+HEALTH=$(echo "$SMART" | awk '/overall-health|Health Status/ {print $NF}' | sort | uniq)
+MEDIA_ERROR=$(echo "$SMART" | grep "ATA Error Count")
+
+if echo "$SMART" | grep -q "QEMU"
+	then
+	STATUS="UNKNOWN: Virtual Disk detected!"
+	EXIT=3
+elif echo "$HEALTH" | grep -qi "FAILED"
+	then
+	STATUS="CRITICAL: Hard drive is unhealthy!"
+	EXIT=2
+elif echo "$HEALTH" | grep -qiE "UNKNOWN|CAUTION|WARNING"
+	then
+	STATUS="WARNING: Hard drive health is unknown!"
+	EXIT=1
+elif [ ! -z "$MEDIA_ERROR" ]
+        then
+        STATUS="WARNING: Media Error Detected!"
+        EXIT=1
+elif echo "$HEALTH" | grep -qiE "PASSED|OK"
+	then
+	STATUS="OK: Hard drive is healthy!"
+	EXIT=0
+elif ! which $CMD &> /dev/null
+	then
+	STATUS="UNKNOWN: smartctl command not found!"
+	EXIT=3
+elif echo "$SCAN" | grep -q "^sudo"
+	then
+	STATUS="UNKNOWN: Plugin require ROOT privilege!"
+	EXIT=3
+elif [ -z "$HEALTH" ]
+	then
+	STATUS="UNKNOWN: Plugin needs to be configured!"
+	EXIT=3
+fi
+
+echo $STATUS
+exit $EXIT

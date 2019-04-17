@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# Author: Smith, Seff
+# Version: v2.0 build 20190401
+
+DB_USER=icinga
+DB_PASS="twEWKI!d@GUoP76"
+
+THREADS=0
+QPS=0
+QS_PREV_SAVE=check_mysql_conn.qs
+
+MYSQL_QUERY() {
+mysql -N  -e 'select Icinga from icinga.icinga;' -u${DB_USER} -p${DB_PASS}  
+}
+
+if ! true &>/dev/null </dev/tcp/127.0.0.1/3306
+then
+       	STATUS="CRITICAL: MySQL NOT Running!"
+	EXIT=2
+else
+
+	STATS=$(mysqladmin version -u${DB_USER} -p${DB_PASS}  2> /dev/null)
+	SERVER=$(echo "$STATS" | awk '/^Server/ {print $3}')
+	UPTIME=$(echo "$STATS" | awk '/Uptime/ {print $2" "$3}')
+	THREADS=$(echo "$STATS" | awk '/Threads/ {print $2}')
+	QPS=$(echo "$STATS" | awk '/Threads/ {print $NF}')
+	QS_CURR=$(echo "$STATS" | awk '/Questions/ {print $4}')
+	if [ -s $QS_PREV_SAVE ]
+		then
+		TS_CURR=$(date +%s)
+		QS_PREV=$(cat $QS_PREV_SAVE)
+		TS_PREV=$(date -r $QS_PREV_SAVE +%s)
+		if [[ ${QS_CURR} -ge ${QS_PREV} ]]; then
+			let QPS="(${QS_CURR} - ${QS_PREV})/(${TS_CURR} - ${TS_PREV})"
+		fi
+	fi
+	echo ${QS_CURR} > ${QS_PREV_SAVE}
+	DETAILS="Threads: ${THREADS}, Q/s: ${QPS}"
+	if [[ $(MYSQL_QUERY 2> /dev/null) = "DB_CONN_TEST" ]]
+	then
+		STATUS="OK: MySQL ${SERVER} is UP for ${UPTIME}! ${DETAILS}"
+		EXIT=0
+	else
+		STATUS="WARNING: MySQL Connection Failed! Uptime: ${UPTIME}, ${DETAILS}"
+		EXIT=1
+	fi
+
+fi
+
+echo "$STATUS | THREADS=${THREADS};;;; Q/s=${QPS};;;;"
+exit $EXIT
+

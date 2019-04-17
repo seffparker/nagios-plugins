@@ -1,0 +1,51 @@
+#!/bin/bash
+
+## Icinga/Nagios plugin to report RX,TX bytes for each interfaces
+
+## Author:  Seff Parker
+## Version: v1.2 20190402
+
+PREV_RXTX_SAVE=check_rxtx.save
+
+if [ ! -s $PREV_RXTX_SAVE ]
+	then
+	STATUS="UNKNOWN: Polling started"
+	EXIT=3
+else
+	CURR_RXTX=$(awk '!/lo:/ && !/Inter/ && !/face/ && !/tap/ && !/tun/ && !/dummy/' /proc/net/dev)
+	PREV_RXTX=$(cat $PREV_RXTX_SAVE)
+	CURR_LC=$(echo "$CURR_RXTX" | wc -l)
+	CURR_CC=$(echo "$CURR_RXTX" | wc -c)
+	PREV_LC=$(echo "$PREV_RXTX" | wc -l)
+	PREV_CC=$(echo "$PREV_RXTX" | wc -c)
+	if [[ $CURR_LC -ne $PREV_LC || $CURR_CC -lt $PREV_CC ]]
+		then
+		STATUS="UNKNOWN: Re-polling started"
+		EXIT=3
+	else
+	CURR_TS=$(date +%s)
+	PREV_TS=$(date -r $PREV_RXTX_SAVE +%s)
+	IFACE=($(echo "$CURR_RXTX" | awk -F : '{print $1}'))
+	IFACE_NOS=${#IFACE[*]}
+	CURR_RX=($(echo "$CURR_RXTX" | awk -F : '{print $2}' | awk '{print $1}'))
+	PREV_RX=($(echo "$PREV_RXTX" | awk -F : '{print $2}' | awk '{print $1}'))
+	CURR_TX=($(echo "$CURR_RXTX" | awk -F : '{print $2}' | awk '{print $9}'))
+	PREV_TX=($(echo "$PREV_RXTX" | awk -F : '{print $2}' | awk '{print $9}'))
+
+	for ((i=0; i<$IFACE_NOS; i++))
+	do	
+		let RXBPS[$i]="(${CURR_RX[$i]} - ${PREV_RX[$i]})/($CURR_TS - $PREV_TS)"
+		let TXBPS[$i]="(${CURR_TX[$i]} - ${PREV_TX[$i]})/($CURR_TS - $PREV_TS)"
+		SHOW_RXTX[$i]="${IFACE[$i]}: RX=$((${RXBPS[$i]}/1024)) KB/s TX=$((${TXBPS[$i]}/1024)) KB/s, "
+		PERF_DATA[$i]="'${IFACE[$i]}:RX'=${RXBPS[$i]}B;;;; '${IFACE[$i]}:TX'=${TXBPS[$i]}B;;;;"
+	done
+
+	EXIT=0
+	STATUS="${SHOW_RXTX[*]}| ${PERF_DATA[*]}"
+	fi
+fi
+
+awk '!/lo:/ && !/Inter/ && !/face/ && !/tap/ && !/tun/ && !/dummy/' /proc/net/dev > $PREV_RXTX_SAVE
+echo "$STATUS"
+exit $EXIT
+

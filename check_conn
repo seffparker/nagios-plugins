@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# Nagios/Icinga script to check and report active TCP connections to the server
+# Author: Seff P.
+# Version: 20180729
+
+MAIL_PORTS='110|143|993|995|25|26|465|587'
+HTTP_PORTS='80|443|8080|8443'
+MYSQL_PORTS='3306'
+
+WARN=800 # Default warninig level
+CRIT=1500 # Default critical level
+
+# Read custom options from arguments
+while getopts ":w:c:" opt; do
+  case ${opt} in
+    w )
+      WARN=$OPTARG
+      ;;
+    c )
+      CRIT=$OPTARG
+      ;;
+  esac
+done
+shift $((OPTIND -1))
+
+if [ $WARN -gt $CRIT ]
+	then echo 'UNKNOWN: Warning level should be lower than critical!'
+	exit 3
+fi
+
+CONN_LIST=$(netstat -tan | grep -P '.*((?!127.0.0.1).)*(ESTABLISHED|TIME_WAIT).*$')
+
+COUNT_ALL=$(echo "$CONN_LIST" | wc -l)
+COUNT_EST=$(echo "$CONN_LIST" | grep -cw ESTABLISHED)
+COUNT_TW=$(echo "$CONN_LIST" | grep -cw TIME_WAIT)
+
+HTTP_COUNT=$(echo "$CONN_LIST" | awk {'print $4'} | cut -d':' -f2 | grep -cwP $HTTP_PORTS)
+MAIL_COUNT=$(echo "$CONN_LIST" | awk {'print $4'} | cut -d':' -f2 | grep -cwP $MAIL_PORTS)
+MYSQL_COUNT=$(echo "$CONN_LIST" | awk {'print $4'} | cut -d':' -f2 | grep -cwP $MYSQL_PORTS)
+
+echo "Total TCP connections: $COUNT_ALL (ESTABLISHED=$COUNT_EST, TIME_WAIT=$COUNT_TW, HTTP=$HTTP_COUNT, MAIL=$MAIL_COUNT, MYSQL=$MYSQL_COUNT) | ESTABLISHED=$COUNT_EST;;;; TIME_WAIT=$COUNT_TW;;;; HTTP=$HTTP_COUNT;;;; MAIL=$MAIL_COUNT;;;; MYSQL=$MYSQL_COUNT;;;; TOTAL=$COUNT_ALL;$WARN;$CRIT;;"
+
+if [ $COUNT_ALL -lt $WARN ]
+	then exit 0; #OK
+elif [ $COUNT_ALL -lt $CRIT ]
+	then exit 1; #WARNING
+else
+	exit 2; #CRITICAL
+fi
+

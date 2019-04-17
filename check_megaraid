@@ -1,0 +1,38 @@
+#!/bin/sh
+
+## Script to check and report MegaRAID health for Nagios/Icinga Monitoring System
+## Version: 20181104
+## Author: Seff P.
+
+MEGACLIS="/sbin/MegaCli /usr/sbin/MegaCli"
+
+for MEGACLI in $MEGACLIS
+do
+if [ -f "$MEGACLI" ]
+        then
+        EXIT=0
+        MESSAGE="OK: RAID looks running fine"
+        DRIVE_STATUS=$(sudo $MEGACLI -AdpAllInfo -aALL -NoLog 2> /dev/null | grep -E  '^  (Degraded|Failed|Critical)')
+        MEDIA_STATUS=$(sudo $MEGACLI -PDList -aAll -NoLog 2> /dev/null | grep "Count: ")
+        if echo "$DRIVE_STATUS" | grep -vwq '0'
+                then EXIT=2
+                MESSAGE="CRITICAL: Disk Error!"
+        elif echo "$MEDIA_STATUS" | grep -vwq '0'
+                then EXIT=1
+                MESSAGE="WARNING: Media Error!"
+        elif [ -z "$DRIVE_STATUS" ]
+                then echo "UNKNOWN: No RAID status from MegaCli!"
+                exit 3
+        fi
+fi
+done
+
+if [ -z "$MESSAGE" ]
+	then echo "UNKNOWN: MegaCli command not found!"
+	exit 3
+fi
+
+DETAILS=$(echo -e "${DRIVE_STATUS}\n${MEDIA_STATUS}" | sort | uniq | sed 's|\s*:|:|g' | sed 's|^\s*||g' | sed 's|\s*$||g' | sed ':a;N;$!ba;s/\n/, /g')
+PERFDATA=$(echo -e "${DRIVE_STATUS}\n${MEDIA_STATUS}" | sort | uniq | sed 's|\s*:\s*|=|g' | sed 's|\s*||g' | sed ':a;N;$!ba;s/\n/;;;; /g')
+echo -n "${MESSAGE} - ${DETAILS}| ${PERFDATA}"
+exit $EXIT
