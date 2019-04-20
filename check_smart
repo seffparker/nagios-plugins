@@ -4,16 +4,17 @@ show_version(){
 echo -e "
 Nagios/Icinga script to check S.M.A.R.T. health status of physical disks
 Author:  Seff Parker
-Version: v1.2 build 20181212
+Version: v2 build 20160420
 "
 }
 
 CMD="sudo /usr/sbin/smartctl"
 RAID_TYPE="auto"
 DEVICE_IDS="auto"
+DRIVES="auto"
 
 # Read options from arguments
-while getopts ":t:i:V" opt; do
+while getopts ":t:i:d:V" opt; do
   case ${opt} in
     t )
 	RAID_TYPE=$OPTARG
@@ -21,20 +22,28 @@ while getopts ":t:i:V" opt; do
     i )
 	DEVICE_IDS=$OPTARG
 	;;
+    d )
+	DRIVES=$OPTARG
+	;;
     V )
         show_version
         exit 3
 	;;
     * )
-	echo "Usage: $0 [-t sat+megaraid|auto] [-i 5,7|auto]"
+	echo "Usage: $0 [-t sat+megaraid|auto] [-i 5,7|auto] [-d /dev/nvme0,/dev/nvme1"
 	exit 3
 	;;
   esac
 done
 shift $((OPTIND -1))
 
-SCAN=$($CMD --scan 2>&1)
-DRIVES=$(echo "$SCAN" | awk '/sd/ {print $1}')
+if [ "$DRIVES" == "auto" ]
+	then
+	SCAN=$($CMD --scan 2>&1)
+	DRIVES=$(echo "$SCAN" | awk '/sd/ {print $1}')
+else
+	DRIVES=$(echo "$DRIVES" | sed 's|,| |g')
+fi
 if [ "$RAID_TYPE" == "auto" ]
 	then
 	RAID_ARRAYS=$(echo "$SCAN" | awk '/bus/ {print $3}')
@@ -46,11 +55,7 @@ else
 	done)
 fi
 
-if [ -z "$SCAN" ]
-	then
-	STATUS="UNKNOWN: No physical drives detected!"
-	EXIT=3
-elif [ -z "$RAID_ARRAYS" ]
+if [ -z "$RAID_ARRAYS" ]
 	then
 	SMART=$(for DRIVE in $DRIVES
         do
@@ -69,7 +74,15 @@ fi
 HEALTH=$(echo "$SMART" | awk '/overall-health|Health Status/ {print $NF}' | sort | uniq)
 MEDIA_ERROR=$(echo "$SMART" | grep "ATA Error Count")
 
-if echo "$SMART" | grep -q "QEMU"
+if ! which $CMD &> /dev/null
+	then
+	STATUS="UNKNOWN: smartctl command not found!"
+	EXIT=3
+elif [ -z "$DRIVES" ]
+	then
+	STATUS="UNKNOWN: No physical drives auto-detected! Configure plugin manually"
+	EXIT=3
+elif echo "$SMART" | grep -q "QEMU"
 	then
 	STATUS="UNKNOWN: Virtual Disk detected!"
 	EXIT=3
@@ -89,10 +102,6 @@ elif echo "$HEALTH" | grep -qiE "PASSED|OK"
 	then
 	STATUS="OK: Hard drive is healthy!"
 	EXIT=0
-elif ! which $CMD &> /dev/null
-	then
-	STATUS="UNKNOWN: smartctl command not found!"
-	EXIT=3
 elif echo "$SCAN" | grep -q "^sudo"
 	then
 	STATUS="UNKNOWN: Plugin require ROOT privilege!"
