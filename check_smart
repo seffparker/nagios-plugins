@@ -4,14 +4,15 @@ show_version(){
 echo -e "
 Nagios/Icinga script to check S.M.A.R.T. health status of physical disks
 Author:  Seff Parker
-Version: v2 build 20160420
+Version: v2.1 build 20160421
 "
 }
 
-CMD="sudo /usr/sbin/smartctl"
+CMD="/usr/sbin/smartctl"
 RAID_TYPE="auto"
 DEVICE_IDS="auto"
 DRIVES="auto"
+shopt -s nocasematch
 
 # Read options from arguments
 while getopts ":t:i:d:V" opt; do
@@ -37,9 +38,37 @@ while getopts ":t:i:d:V" opt; do
 done
 shift $((OPTIND -1))
 
+SMARTCTL(){
+	SMART_OUTPUT=$(sudo $CMD $@ 2>&1)
+	NOSUDO=$(echo "$SMART_OUTPUT" | grep ^sudo)
+	SN=$(echo "$SMART_OUTPUT" | awk '/^Serial/ {print $3}')
+	QEMU=$(echo "$SMART_OUTPUT" | grep "QEMU")
+	if [[ "$SN" && ! "$QEMU" && ! "${ALL_SN[@]}" =~ $SN  ]]
+	then
+		HEALTH=$(echo "$SMART_OUTPUT" | awk '/overall-health|Health Status/ {print $NF}')
+		MEDIA_ERROR=$(echo "$SMART_OUTPUT" | grep "ATA Error Count")
+		case $HEALTH in
+		 FAILED)
+			CRTI_SN+=($SN)
+			;;
+		 CAUTION|WARNING)
+			WARN_SN+=($SN)
+			;;
+		 PASSED|OK)
+			OK_SN+=($SN)
+			;;
+		 *)
+			UN_SN+=($SN)
+			;;
+		esac
+		[[ "$MEDIA_ERROR" ]] && MEDIA_ERR_SN+=($SN)
+		ALL_SN+=($SN)
+	fi
+}
+
 if [ "$DRIVES" == "auto" ]
 	then
-	SCAN=$($CMD --scan 2>&1)
+	SCAN=$(sudo $CMD --scan 2>&1)
 	DRIVES=$(echo "$SCAN" | awk '/sd/ {print $1}')
 else
 	DRIVES=$(echo "$DRIVES" | sed 's|,| |g')
@@ -57,59 +86,68 @@ fi
 
 if [ -z "$RAID_ARRAYS" ]
 	then
-	SMART=$(for DRIVE in $DRIVES
+	for DRIVE in $DRIVES
         do
-		$CMD -t short --offlineauto=on -a $DRIVE
-	done)
+		SMARTCTL -t short --offlineauto=on -a $DRIVE
+	done
 else
-	SMART=$(for DRIVE in $DRIVES
+	for DRIVE in $DRIVES
 		do
 		for RAID_ARRAY in $RAID_ARRAYS
 		do
-		 $CMD -t short --offlineauto=on -a -d $RAID_ARRAY ${DRIVE}
+		 SMARTCTL -t short --offlineauto=on -a -d $RAID_ARRAY ${DRIVE}
 		done
-	done)
+	done
 fi
 
-HEALTH=$(echo "$SMART" | awk '/overall-health|Health Status/ {print $NF}' | sort | uniq)
-MEDIA_ERROR=$(echo "$SMART" | grep "ATA Error Count")
+## DEBUG
+# echo ${ALL_SN[*]}
+# echo ${CRTI_SN[*]}
+# echo ${WARN_SN[*]}
+# echo ${OK_SN[*]}
+# echo ${UN_SN[*]}
+# echo ${MEDIA_ERR_SN[*]}
 
 if ! which $CMD &> /dev/null
 	then
 	STATUS="UNKNOWN: smartctl command not found!"
 	EXIT=3
+elif [ "$NOSUDO" ]
+        then
+        STATUS="UNKNOWN: Plugin require ROOT privilege!"
+        EXIT=3
 elif [ -z "$DRIVES" ]
 	then
 	STATUS="UNKNOWN: No physical drives auto-detected! Configure plugin manually"
 	EXIT=3
-elif echo "$SMART" | grep -q "QEMU"
-	then
-	STATUS="UNKNOWN: Virtual Disk detected!"
-	EXIT=3
-elif echo "$HEALTH" | grep -qi "FAILED"
-	then
-	STATUS="CRITICAL: Hard drive is unhealthy!"
-	EXIT=2
-elif echo "$HEALTH" | grep -qiE "UNKNOWN|CAUTION|WARNING"
-	then
-	STATUS="WARNING: Hard drive health is unknown!"
-	EXIT=1
-elif [ ! -z "$MEDIA_ERROR" ]
-        then
-        STATUS="WARNING: Media Error Detected!"
-        EXIT=1
-elif echo "$HEALTH" | grep -qiE "PASSED|OK"
-	then
-	STATUS="OK: Hard drive is healthy!"
-	EXIT=0
-elif echo "$SCAN" | grep -q "^sudo"
-	then
-	STATUS="UNKNOWN: Plugin require ROOT privilege!"
-	EXIT=3
-elif [ -z "$HEALTH" ]
+elif [ -z "${ALL_SN[*]}" ]
 	then
 	STATUS="UNKNOWN: Plugin needs to be configured!"
 	EXIT=3
+elif [ "$QEMU" ]
+	then
+	STATUS="UNKNOWN: Virtual Disk detected!"
+	EXIT=3
+elif [ "${CRTI_SN[*]}" ]
+	then
+	STATUS="CRITICAL: ${#CRTI_SN[*]} of ${#ALL_SN[*]} Hard drive is unhealthy! Serial #: ${CRTI_SN[*]}"
+	EXIT=2
+elif [ "${WARN_SN[*]}" ]
+	then
+	STATUS="WARNING: ${#WARN_SN[*]} of ${#ALL_SN[*]} Hard drive health not looks good! Serial #: ${WARN_SN[*]}"
+	EXIT=1
+elif [ "${MEDIA_ERR_SN[*]}" ]
+        then
+        STATUS="WARNING: ${#MEDIA_ERR_SN[*]} of ${#ALL_SN[*]} has Media Errors! Serial #: ${MEDIA_ERR_SN[*]}"
+        EXIT=1
+elif [ "${UN_SN[*]}" ]
+	then
+	STATUS="UNKNOWN: ${#UN_SN[*]} of ${#ALL_SN[*]} has unknown health status! Serial #: ${UN_SN[*]}"
+	EXIT=3
+elif [ "${OK_SN[*]}" ]
+	then
+	STATUS="OK: All ${#ALL_SN[*]} Hard drive(s) looks healthy! Serial #: ${OK_SN[*]}"
+	EXIT=0
 fi
 
 echo $STATUS
