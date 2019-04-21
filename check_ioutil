@@ -4,7 +4,7 @@ show_version(){
 echo -e "
 Nagios/Icinga script to check and report Disk I/O utilization in percentage
 Author:  Seff Parker
-Version: v2.0 build 20190302
+Version: v2.1 build 20190421
 "
 }
 
@@ -47,7 +47,8 @@ elif [ ! -s $PREV_DS_SAVE ]
 	STATUS="UNKNOWN: Cannot read disk stats from Kernel"
 	EXIT=3
 else
-	CURR_DS=$(cat /proc/diskstats 2> /dev/null)
+	PART=$(ls -l /dev/disk/by-uuid/* | awk -F "/" '!/\/loop/ && !/\/ram/ && !/\/sr/ && !/\/fd/ {printf $NF"|"}')
+	CURR_DS=$(cat /proc/diskstats 2> /dev/null | grep -wE "${PART}#" | sort -k 3)
 	PREV_DS=$(cat $PREV_DS_SAVE)
 	CURR_LC=$(echo "$CURR_DS" | wc -l)
 	CURR_CC=$(echo "$CURR_DS" | wc -c)
@@ -62,9 +63,9 @@ else
 	PREV_TS=$(date -r $PREV_DS_SAVE +%s)
 	let POLL_TIME="($CURR_TS - $PREV_TS)"
 
-	DISKS=($(echo "$PREV_DS" | awk '!/loop/ && !/ram/ && !/sr/ && !/fd/ {print $3}'))
-	MS_BEGIN=($(echo "$PREV_DS" | awk '!/loop/ && !/ram/ && !/sr/ && !/fd/ {print $13}'))
-	MS_END=($(echo "$CURR_DS" | awk '!/loop/ && !/ram/ && !/sr/ && !/fd/ {print $13}'))
+	DISKS=($(echo "$PREV_DS" | awk '{print $3}'))
+	MS_BEGIN=($(echo "$PREV_DS" | awk '{print $13}'))
+	MS_END=($(echo "$CURR_DS" | awk '{print $13}'))
 	DISK_NOS=${#DISKS[*]}
 
 	# Debug:
@@ -98,6 +99,6 @@ else
 	fi
 fi
 
-cat /proc/diskstats 2> /dev/null > $PREV_DS_SAVE
+echo "$CURR_DS" > $PREV_DS_SAVE
 echo "${STATUS}${STATS}"
 exit $EXIT
