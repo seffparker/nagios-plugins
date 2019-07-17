@@ -19,7 +19,7 @@ Binary dependencies: cat, awk, date
 ---
 
 ### check_megaraid
-Report MegaRAID member disk errors (failed, degraded, critical) and media errors along with RAID Level, device slot number and serial number.
+Report MegaRAID array status (failed, degraded, critical, media errors, and rebulid progress) along with RAID Level, device slot number and serial number.
 
 Binary dependencies: MegaCLI, echo, grep, sort, uniq, sed, sudo (optional)
 
