@@ -4,7 +4,7 @@ show_version(){
 echo -e "
 Nagios/Icinga script to check S.M.A.R.T. health status of physical disks
 Author:  Seff Parker
-Version: v2.1 build 20160421
+Version: v3.0 build 20190421
 "
 }
 
