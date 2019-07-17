@@ -1,38 +1,83 @@
-#!/bin/sh
+#!/bin/bash
 
 ## Script to check and report MegaRAID health for Nagios/Icinga Monitoring System
-## Version: 20181104
+## Version: 2.0 20190717
 ## Author: Seff P.
 
 MEGACLIS="/sbin/MegaCli /usr/sbin/MegaCli"
 
-for MEGACLI in $MEGACLIS
-do
-if [ -f "$MEGACLI" ]
-        then
-        EXIT=0
-        MESSAGE="OK: RAID looks running fine"
-        DRIVE_STATUS=$(sudo $MEGACLI -AdpAllInfo -aALL -NoLog 2> /dev/null | grep -E  '^  (Degraded|Failed|Critical)')
-        MEDIA_STATUS=$(sudo $MEGACLI -PDList -aAll -NoLog 2> /dev/null | grep "Count: ")
-        if echo "$DRIVE_STATUS" | grep -vwq '0'
-                then EXIT=2
-                MESSAGE="CRITICAL: Disk Error!"
-        elif echo "$MEDIA_STATUS" | grep -vwq '0'
-                then EXIT=1
-                MESSAGE="WARNING: Media Error!"
-        elif [ -z "$DRIVE_STATUS" ]
-                then echo "UNKNOWN: No RAID status from MegaCli!"
-                exit 3
-        fi
-fi
-done
 
-if [ -z "$MESSAGE" ]
-	then echo "UNKNOWN: MegaCli command not found!"
+if ! grep -q megaraid /proc/bus/pci/devices
+	then
+	echo "UNKNOWN: No MegaRAID Controller detected"
 	exit 3
 fi
 
-DETAILS=$(echo -e "${DRIVE_STATUS}\n${MEDIA_STATUS}" | sort | uniq | sed 's|\s*:|:|g' | sed 's|^\s*||g' | sed 's|\s*$||g' | sed ':a;N;$!ba;s/\n/, /g')
-PERFDATA=$(echo -e "${DRIVE_STATUS}\n${MEDIA_STATUS}" | sort | uniq | sed 's|\s*:\s*|=|g' | sed 's|\s*||g' | sed ':a;N;$!ba;s/\n/;;;; /g')
-echo -n "${MESSAGE} - ${DETAILS}| ${PERFDATA}"
-exit $EXIT
+for BIN_PATH in $MEGACLIS
+do
+	if [ -f "$BIN_PATH" ]
+	then
+		MEGACLI=$BIN_PATH
+	fi
+done
+
+if [ -z "$MEGACLI" ]
+	then
+	echo "UNKNOWN: MegaCli command not found"
+	exit 3
+fi
+
+if ! which sudo &> /dev/null
+	then
+	echo "UNKNOWN: sudo command required"
+	exit 3
+fi
+
+RAID_OUTPUT=$(sudo $MEGACLI -LdPdInfo -aALL 2> /dev/null)
+SLOT_IDS=$(echo "$RAID_OUTPUT" | awk '/Slot Number/ {print $NF}')
+ENC_ID=$(echo "$RAID_OUTPUT" | awk '/Enclosure Device ID/ {print $NF;exit}')
+LEVEL=($(echo "$RAID_OUTPUT"| grep -i "RAID Level" | grep -o [0-9]))
+let LEVEL=(${LEVEL[0]}+${LEVEL[1]}*${LEVEL[1]})
+
+for SLOT_ID in ${SLOT_IDS}
+	do
+	DEVICE_OUTPUT=$(echo "$RAID_OUTPUT" | sed -n "/Slot Number: ${SLOT_ID}/,/Inquiry Data/p")
+	SN[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk '/Inquiry Data/ {print $3}')
+	STATE[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk -F ":" '/Firmware state/ {print $2}')
+	MEC[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk '/Count: / {SUM += $4} END {print SUM}')
+	if [[ "${STATE[$SLOT_ID]}" =~ Rebuild ]]
+		then
+		REBUILD_STATUS=$(sudo $MEGACLI -PDRbld -ShowProg -PhysDrv [${ENC_ID}:${SLOT_ID}] -aALL 2> /dev/null | grep -i "Rebuild")
+		REBUILD_DEVICE=$SLOT_ID
+	elif [[ "${STATE[$SLOT_ID]}" =~ Online ]]
+		then
+		OK_DEVICE[$SLOT_ID]=$SLOT_ID
+	else
+		CRIT_DEVICE=$SLOT_ID
+	fi
+	if [[ ${MEC[$SLOT_ID]} != 0 ]]
+		then
+		WARN_DEVICE=$SLOT_ID
+	fi
+done
+
+if [ "$REBUILD_DEVICE" ]
+	then
+	STATUS="WARNING: ${REBUILD_STATUS} S/N: ${SN[${REBUILD_DEVICE}]}"
+	EXIT=1
+elif [ "${CRIT_DEVICE}" ]
+	then
+	STATUS="CRITICAL: Device ID ${CRIT_DEVICE[*]} is${STATE[${CRIT_DEVICE}]}. S/N: ${SN[${CRIT_DEVICE}]}"
+	EXIT=2
+elif [ "${WARN_DEVICE}" ]
+	then
+	STATUS="WARNING: Device ID ${WARN_DEVICE[*]} reported ${MEC[${WARN_DEVICE}]} media errors. S/N: ${SN[${WARN_DEVICE}]}"
+	EXIT=1
+else
+	IFS=','
+	STATUS="OK: All ${#OK_DEVICE[*]} disks of RAID-${LEVEL} is healthy. S/N: ${SN[*]}"
+	EXIT=0
+fi
+echo "$STATUS"
+exit "$EXIT"
+
