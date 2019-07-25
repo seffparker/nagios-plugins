@@ -19,9 +19,9 @@ Binary dependencies: cat, awk, date
 ---
 
 ### check_megaraid
-Report MegaRAID member disk errors (failed, degraded, critical) and media errors.
+Report MegaRAID array status (failed, degraded, critical, media errors, and rebulid progress) along with RAID Level, device slot number and serial number.
 
-Binary dependencies: MegaCLI, echo, grep, sort, uniq, sed
+Binary dependencies: MegaCLI, echo, grep, sort, uniq, sed, sudo (optional)
 
 ---
 
@@ -55,6 +55,6 @@ Binary dependencies: awk, cat, echo, date
 
 ### check_smart
 
-Report SMART health status for physical disks including those attached to a RAID array. The script attempt to auto-detect device IDs and raid type. If it failes, you may need to manually specify via aurguments.
+Report SMART health status for physical disks including those attached to a RAID array along with device serial number. The script attempt to auto-detect device IDs and raid type. If it failes, you may need to manually specify via aurguments.
 
-Binary dependencies: smartctl, echo, awk, sort, uniq
+Binary dependencies: smartctl, echo, awk, sort, uniq, sudo (optional)
