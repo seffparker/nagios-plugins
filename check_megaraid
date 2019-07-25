@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ## Script to check and report MegaRAID health for Nagios/Icinga Monitoring System
-## Version: 2.0 20190717
+## Version: 2.1 20190725
 ## Author: Seff P.
 
 MEGACLIS="/sbin/MegaCli /usr/sbin/MegaCli"
@@ -33,7 +33,8 @@ if ! which sudo &> /dev/null
 	exit 3
 fi
 
-RAID_OUTPUT=$(sudo $MEGACLI -LdPdInfo -aALL 2> /dev/null)
+RAID_OUTPUT=$(sudo $MEGACLI -LDInfo -Lall -aALL -NoLog && sudo $MEGACLI -PdList -aALL -NoLog)
+RAID_STATE=$(echo "$RAID_OUTPUT" | awk '/^State:/ {print $2}')
 SLOT_IDS=$(echo "$RAID_OUTPUT" | awk '/Slot Number/ {print $NF}')
 ENC_ID=$(echo "$RAID_OUTPUT" | awk '/Enclosure Device ID/ {print $NF;exit}')
 LEVEL=($(echo "$RAID_OUTPUT"| grep -i "RAID Level" | grep -o [0-9]))
@@ -42,14 +43,15 @@ let LEVEL=(${LEVEL[0]}+${LEVEL[1]}*${LEVEL[1]})
 for SLOT_ID in ${SLOT_IDS}
 	do
 	DEVICE_OUTPUT=$(echo "$RAID_OUTPUT" | sed -n "/Slot Number: ${SLOT_ID}/,/Inquiry Data/p")
+	DEVICE_ID[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk '/Device Id:/ {print $3}')
 	SN[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk '/Inquiry Data/ {print $3}')
-	STATE[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk -F ":" '/Firmware state/ {print $2}')
+	DRIVE_STATE[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk -F ":" '/Firmware state/ {print $2}')
 	MEC[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk '/Count: / {SUM += $4} END {print SUM}')
-	if [[ "${STATE[$SLOT_ID]}" =~ Rebuild ]]
+	if [[ "${DRIVE_STATE[$SLOT_ID]}" =~ Rebuild ]]
 		then
-		REBUILD_STATUS=$(sudo $MEGACLI -PDRbld -ShowProg -PhysDrv [${ENC_ID}:${SLOT_ID}] -aALL 2> /dev/null | grep -i "Rebuild")
+		REBUILD_STATUS=$(sudo $MEGACLI -PDRbld -ShowProg -PhysDrv [${ENC_ID}:${SLOT_ID}] -aALL -NoLog | grep -i "Rebuild")
 		REBUILD_DEVICE=$SLOT_ID
-	elif [[ "${STATE[$SLOT_ID]}" =~ Online ]]
+	elif [[ "${DRIVE_STATE[$SLOT_ID]}" =~ Online ]]
 		then
 		OK_DEVICE[$SLOT_ID]=$SLOT_ID
 	else
@@ -67,17 +69,16 @@ if [ "$REBUILD_DEVICE" ]
 	EXIT=1
 elif [ "${CRIT_DEVICE}" ]
 	then
-	STATUS="CRITICAL: Device ID ${CRIT_DEVICE[*]} is${STATE[${CRIT_DEVICE}]}. S/N: ${SN[${CRIT_DEVICE}]}"
+	STATUS="CRITICAL: RAID${LEVEL} is $RAID_STATE. Slot #${CRIT_DEVICE}, Device ID #${DEVICE_ID[${CRIT_DEVICE}]} is${DRIVE_STATE[${CRIT_DEVICE}]}. S/N: ${SN[${CRIT_DEVICE}]}"
 	EXIT=2
 elif [ "${WARN_DEVICE}" ]
 	then
-	STATUS="WARNING: Device ID ${WARN_DEVICE[*]} reported ${MEC[${WARN_DEVICE}]} media errors. S/N: ${SN[${WARN_DEVICE}]}"
+	STATUS="WARNING: Slot #${WARN_DEVICE[*]}, Device ID #${DEVICE_ID[${CRIT_DEVICE}]} reported ${MEC[${WARN_DEVICE}]} media errors. S/N: ${SN[${WARN_DEVICE}]}"
 	EXIT=1
 else
 	IFS=','
-	STATUS="OK: All ${#OK_DEVICE[*]} disks of RAID-${LEVEL} is healthy. S/N: ${SN[*]}"
+	STATUS="OK: RAID${LEVEL} is $RAID_STATE. All ${#OK_DEVICE[*]} disks are healthy. S/N: ${SN[*]}"
 	EXIT=0
 fi
 echo "$STATUS"
 exit "$EXIT"
-
