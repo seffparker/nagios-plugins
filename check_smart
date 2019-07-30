@@ -1,21 +1,18 @@
 #!/bin/bash
 
-show_version(){
-echo -e "
-Nagios/Icinga script to check S.M.A.R.T. health status of physical disks
-Author:  Seff Parker
-Version: v3.0 build 20190421
-"
-}
+## Nagios/Icinga script to check S.M.A.R.T. health status of physical disks
+## Author:  Seff Parker
+## Version: v3.1 build 20190730
 
 CMD="/usr/sbin/smartctl"
 RAID_TYPE="auto"
 DEVICE_IDS="auto"
 DRIVES="auto"
+
 shopt -s nocasematch
 
 # Read options from arguments
-while getopts ":t:i:d:V" opt; do
+while getopts ":t:i:d:" opt; do
   case ${opt} in
     t )
 	RAID_TYPE=$OPTARG
@@ -25,10 +22,6 @@ while getopts ":t:i:d:V" opt; do
 	;;
     d )
 	DRIVES=$OPTARG
-	;;
-    V )
-        show_version
-        exit 3
 	;;
     * )
 	echo "Usage: $0 [-t sat+megaraid|auto] [-i 5,7|auto] [-d /dev/nvme0,/dev/nvme1"
@@ -61,7 +54,20 @@ SMARTCTL(){
 			UN_SN+=($SN)
 			;;
 		esac
-		[[ "$MEDIA_ERROR" ]] && MEDIA_ERR_SN+=($SN)
+		if [[ "$MEDIA_ERROR" ]]
+			then
+			MEDIA_ERR_SN+=($SN)
+			MEC=$(echo "$SMART_OUTPUT" | awk '/ATA Error Count/ {print $4}')
+			let MEC_SUM=($MEC_SUM + $MEC)
+			ONLINE_HOURS=$(echo "$SMART_OUTPUT" | awk '/Power_On_Hours/ {print $NF}')
+			ERROR_HOUR=$(echo "$SMART_OUTPUT" | awk -v MEC=$MEC '$0 ~ "Error "MEC {print $8}')
+			ERROR_AGO_PREV=$ERROR_AGO
+			let ERROR_AGO=($ONLINE_HOURS - $ERROR_HOUR)
+			if [[ "$ERROR_AGO_PREV" -lt "$ERROR_AGO" && "$ERROR_AGO_PREV" != "" ]]
+				then
+				ERROR_AGO=$ERROR_AGO_PREV
+			fi	
+		fi
 		ALL_SN+=($SN)
 	fi
 }
@@ -130,15 +136,15 @@ elif [ "$QEMU" ]
 	EXIT=3
 elif [ "${CRTI_SN[*]}" ]
 	then
-	STATUS="CRITICAL: ${#CRTI_SN[*]} of ${#ALL_SN[*]} Hard drive is unhealthy! Serial #: ${CRTI_SN[*]}"
+	STATUS="CRITICAL: ${#CRTI_SN[*]} of ${#ALL_SN[*]} drive is unhealthy! Serial #: ${CRTI_SN[*]}"
 	EXIT=2
 elif [ "${WARN_SN[*]}" ]
 	then
-	STATUS="WARNING: ${#WARN_SN[*]} of ${#ALL_SN[*]} Hard drive health not looks good! Serial #: ${WARN_SN[*]}"
+	STATUS="WARNING: ${#WARN_SN[*]} of ${#ALL_SN[*]} drive health not looks good! Serial #: ${WARN_SN[*]}"
 	EXIT=1
 elif [ "${MEDIA_ERR_SN[*]}" ]
         then
-        STATUS="WARNING: ${#MEDIA_ERR_SN[*]} of ${#ALL_SN[*]} has Media Errors! Serial #: ${MEDIA_ERR_SN[*]}"
+        STATUS="WARNING: ${#MEDIA_ERR_SN[*]} of ${#ALL_SN[*]} drive has $MEC_SUM Media Errors most recent at $ERROR_AGO hours! Serial #: ${MEDIA_ERR_SN[*]}"
         EXIT=1
 elif [ "${UN_SN[*]}" ]
 	then
