@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ## Script to check and report MegaRAID health for Nagios/Icinga Monitoring System
-## Version: 2.1 20190725
+## Version: 2.2 20190805
 ## Author: Seff P.
 
 MEGACLIS="/sbin/MegaCli /usr/sbin/MegaCli"
@@ -34,7 +34,7 @@ if ! which sudo &> /dev/null
 fi
 
 RAID_OUTPUT=$(sudo $MEGACLI -LDInfo -Lall -aALL -NoLog && sudo $MEGACLI -PdList -aALL -NoLog)
-RAID_STATE=$(echo "$RAID_OUTPUT" | awk '/^State:/ {print $2}')
+RAID_STATE=$(echo "$RAID_OUTPUT" | awk '/^State/ {print $NF}' | uniq)
 SLOT_IDS=$(echo "$RAID_OUTPUT" | awk '/Slot Number/ {print $NF}')
 ENC_ID=$(echo "$RAID_OUTPUT" | awk '/Enclosure Device ID/ {print $NF;exit}')
 LEVEL=($(echo "$RAID_OUTPUT"| grep -i "RAID Level" | grep -o [0-9]))
