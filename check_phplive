@@ -1,0 +1,81 @@
+#!/bin/bash
+
+# Icinga/Nagios script to check PHPLive Chat operartor status
+#
+# Author: Seff P.
+# Version: 20190616
+
+while getopts ":h:t:d:" opt; do
+  case ${opt} in
+    h )
+      HOST=$OPTARG
+      ARGS+=1
+      ;;
+    t )
+      TOKEN=$OPTARG
+      ARGS+=1
+      ;;
+    d )
+      DEPTS=$OPTARG
+      ARGS+=1
+      ;;
+    : )
+      echo "UNKNOWN: Option $OPTARG requires an argument"
+      exit 3
+      ;;
+    * )
+      echo "UNKNOWN: Invalid arguments ${opt}"
+      exit 3
+      ;;
+  esac
+done
+shift $((OPTIND -1))
+
+[ "$ARGS" != "111" ] && echo "UNKNOWN: Required arguments missing" && exit 3
+
+DEPTS=$(echo $DEPTS | sed "s|,\s*|,|g")
+
+LIST_ALL=$(curl -Ls --connect-timeout 5 --insecure "http://${HOST}/phplive.php?&token=${TOKEN}" | grep -Po "<option class.*/option>" | sed 's|<\/option>|<\/option>\n|g')
+
+# Debug
+# echo "ARGS: HOST=$HOST TOKEN=$TOKEN DEPTS=$DEPTS"
+# echo "LIST_ALL=$LIST_ALL"
+
+DEPTS=$(echo $DEPTS | sed "s|\s*,\s*|,|g")
+
+IFS=','
+for DEPT in $DEPTS
+	do
+	STATUS=$(echo "$LIST_ALL" | grep -i "$DEPT")
+	if echo $STATUS | grep -iq "online"
+		then LIST_ONLINE+=("$DEPT")
+	elif echo $STATUS | grep -iq "offline"
+		then LIST_OFFLINE+=("$DEPT")
+	else
+		LIST_UNKNOWN+=("$DEPT")
+	fi
+done
+
+if [ -z "$LIST_ALL" ] 
+	then
+	STATUS="UNKNOWN: Unexpected output from PHPLive Chat"
+	EXIT=3
+elif [ ${#LIST_OFFLINE[*]} -gt 0 ]
+	then
+	STATUS="WARNING: Chat operator is offline on ${LIST_OFFLINE[*]}"
+	EXIT=1
+elif [ ${#LIST_UNKNOWN[*]} -gt 0 ]
+	then
+	STATUS="UNKNOWN: Chat operator status unknown on ${LIST_UNKNOWN[*]}"
+	EXIT=3
+elif [ ${#LIST_ONLINE[*]} -gt 0 ]
+	then
+	STATUS="OK: Chat operator is online on ${LIST_ONLINE[*]}"
+	EXIT=0
+else
+	STATUS="UNKNOWN: Coulnd't fetch any departments"
+	EXIT=3
+fi
+
+echo "$STATUS"
+exit $EXIT 
