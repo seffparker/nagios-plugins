@@ -1,0 +1,58 @@
+#!/bin/bash
+
+## Nagios/Icinga plugin to check backup files
+## Author: Seff Parker
+## Version: 20190909
+
+DAYS_OLD=32
+DAYS_NEW=7
+MAX_DEPTH=3
+
+# Read options from arguments
+while getopts ":d:e:o:n:m:" opt; do
+  case ${opt} in
+    d )
+	DIR=$OPTARG
+	;;
+    e )
+	EXT=$OPTARG
+	;;
+    o )
+	DAYS_OLD=$OPTARG
+	;;
+    n )
+	DAYS_NEW=$OPTARG
+	;;
+    m )
+	MAX_DEPTH=$OPTARG
+	;;
+    * )
+	echo "Usage: $0 -d /backup/dir -e tar.gz [-o 32] [-n 7] [-m 4]"
+	exit 3
+	;;
+  esac
+done
+shift $((OPTIND -1))
+
+[ -z $DIR ] && echo "UNKNOWN: Backup directory not specified" && exit 3
+[ -z $EXT ] && echo "UNKNOWN: Backup extention not specified" && exit 3
+[ ! -d "$DIR" ] && echo "UNKNOWN: $DIR not found" && exit 3
+[ ! -r "$DIR" ] && echo "UNKNOWN: $DIR not accessible" && exit 3
+
+BACKUP_NEW_COUNT=$(find $DIR -maxdepth $MAX_DEPTH -name "*.${EXT}" -mtime -${DAYS_NEW} | grep -c .)
+BACKUP_OLD_COUNT=$(find $DIR -maxdepth $MAX_DEPTH -name "*.${EXT}" -mtime +${DAYS_OLD} | grep -c .)
+
+if [ $BACKUP_NEW_COUNT -eq 0 ]
+	then
+	STATUS="CRITICAL: No .$EXT backups were generated under $DIR in last $DAYS_NEW days"
+	EXIT=2
+elif [ $BACKUP_OLD_COUNT -gt 0 ]
+	then
+	STATUS="WARNING: $BACKUP_OLD_COUNT .$EXT backups found under $DIR older than $DAYS_OLD days"
+	EXIT=1
+else
+	STATUS="OK: $BACKUP_NEW_COUNT .$EXT backups generated under $DIR in last $DAYS_NEW days"
+	EXIT=0
+fi
+echo $STATUS
+exit $EXIT
