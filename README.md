@@ -58,3 +58,27 @@ Binary dependencies: awk, cat, echo, date
 Report SMART health status for physical disks including those attached to a RAID array along with device serial number. The script attempt to auto-detect device IDs and raid type. If it failes, you may need to manually specify via aurguments.
 
 Binary dependencies: smartctl, echo, awk, sort, uniq, sudo (optional)
+
+---
+
+### check_backup
+
+Check the existence of given filetypes in the specified backup directory within a range of days. The scan depth can also be specified.
+
+Binary dependencies: find, grep
+
+---
+
+### check_phplive
+
+Check the chat operator status for PHPLive! chat service.
+
+Binary dependencies: curl, grep, sed
+
+---
+
+### check_tawk.js
+
+Check the chat operator status for Tawk chat service.
+
+Binary dependencies: phantomjs
