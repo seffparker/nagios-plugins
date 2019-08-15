@@ -11,6 +11,7 @@ xbl.spamhaus.org
 bl.spamcop.net
 psbl.surriel.com
 b.barracudacentral.org
+spam.dnsbl.sorbs.net
 '
 
 IP_BINS="/usr/sbin/ip /sbin/ip"
