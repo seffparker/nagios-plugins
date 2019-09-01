@@ -2,7 +2,7 @@
 
 # Nagios/Icinga plugin to query server IPs against RBLs
 # Author: Seff P.
-# Version: 20181118
+# Version: 20190901
 
 RBLS='
 cbl.abuseat.org
@@ -33,10 +33,13 @@ if [ -z "$IPS" ]
 	then 
 	for IP_BIN in $IP_BINS
 	do if [ -f $IP_BIN ]
-	then
-	IPS=$($IP_BIN addr | awk '/inet / {print $2}' | grep -vE '^127\.|^192\.168|^10\.|^172\.' | awk -F / '{print $1}' | sort | uniq)
+		then
+		IPS=$($IP_BIN addr | awk '/inet / {print $2}' | grep -vE '^127\.|^192\.168|^10\.|^172\.' | awk -F / '{print $1}' | sort | uniq)
 	fi
 	done
+	if [ -z "$IPS" ]
+		then IPS=$(dig +short myip.opendns.com @resolver1.opendns.com)
+	fi
 else
 	IPS=$(echo "$IPS" | sed 's/[^\.0-9]\+/\n/g')
 fi
