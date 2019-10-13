@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ## Script to check and report MegaRAID health for Nagios/Icinga Monitoring System
-## Version: 2.2 20190805
+## Version: 2.1 20191013
 ## Author: Seff P.
 
 MEGACLIS="/sbin/MegaCli /usr/sbin/MegaCli"
@@ -46,7 +46,7 @@ for SLOT_ID in ${SLOT_IDS}
 	DEVICE_ID[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk '/Device Id:/ {print $3}')
 	SN[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk '/Inquiry Data/ {print $3}')
 	DRIVE_STATE[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk -F ":" '/Firmware state/ {print $2}')
-	MEC[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk '/Count: / {SUM += $4} END {print SUM}')
+	MEC[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk '/Count: / && !/^Other/ {SUM += $4} END {print SUM}')
 	if [[ "${DRIVE_STATE[$SLOT_ID]}" =~ Rebuild ]]
 		then
 		REBUILD_STATUS=$(sudo $MEGACLI -PDRbld -ShowProg -PhysDrv [${ENC_ID}:${SLOT_ID}] -aALL -NoLog | grep -i "Rebuild")
