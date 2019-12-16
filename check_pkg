@@ -3,7 +3,11 @@
 ## Nagios/Icinga plugin to check package database integrity
 
 ## Author: Seff Parker
-## Version: 20190330
+## Version: 20191216
+
+WARN_DAYS=60
+
+let WARN_SECS="$WARN_DAYS * 86400"
 
 if which rpm &> /dev/null
         then
@@ -15,12 +19,13 @@ if which rpm &> /dev/null
                 LAST_PKG_UPED_TS=$(date -d "$LAST_PKG_UPED" +%s)
                 CURRENT_TS=$(date +%s)
                 let LAST_PKG_UPED_AGO=$CURRENT_TS-$LAST_PKG_UPED_TS
-                if [[ ${LAST_PKG_UPED_AGO} -gt 5184000 ]]
+		let UPED_DAYS="${LAST_PKG_UPED_AGO} / 86400"
+                if [[ ${LAST_PKG_UPED_AGO} -gt ${WARN_SECS} ]]
                         then
-                        STATUS="WARNING: Packages are not updated for last 60 days"
+                        STATUS="WARNING: Packages are not updated for last $UPED_DAYS days"
                         EXIT=1
                 else
-                        STATUS="OK: RPM Database verification succeeded"
+                        STATUS="OK: RPM Database verification succeeded. Last updated $UPED_DAYS days ago"
                 fi
         else
                 STATUS="CRITICAL: $RPM_VERIFY"
@@ -35,12 +40,13 @@ elif which dpkg &> /dev/null
 		LAST_PKG_UPED_TS=$(date -r /var/lib/dpkg/status +%s)
 		CURRENT_TS=$(date +%s)
 		let LAST_PKG_UPED_AGO=$CURRENT_TS-$LAST_PKG_UPED_TS
-		if [[ ${LAST_PKG_UPED_AGO} -gt 5184000 ]]
+		let UPED_DAYS="${LAST_PKG_UPED_AGO} / 86400"
+		if [[ ${LAST_PKG_UPED_AGO} -gt ${WARN_SECS} ]]
 			then
-			STATUS="WARNING: Packages are not updated for last 60 days"
+			STATUS="WARNING: Packages are not updated for last $UPED_DAYS days"
 			EXIT=1
 		else
-			STATUS="OK: DPKG Database verification succeeded"
+			STATUS="OK: DPKG Database verification succeeded. Last updated $UPED_DAYS days ago"
 		fi
 	else
 		STATUS="CRITICAL: $DPKG_VERIFY"
