@@ -2,7 +2,7 @@
 
 # Nagios/Icinga plugin to query server IPs against RBLs
 # Author: Seff P.
-# Version: 20190901
+# Version: 20200521
 
 RBLS='
 cbl.abuseat.org
@@ -30,18 +30,18 @@ while getopts ":i:" opt; do
 done
 
 if [ -z "$IPS" ]
-	then 
-	for IP_BIN in $IP_BINS
-	do if [ -f $IP_BIN ]
-		then
-		IPS=$($IP_BIN addr | awk '/inet / {print $2}' | grep -vE '^127\.|^192\.168|^10\.|^172\.' | awk -F / '{print $1}' | sort | uniq)
-	fi
-	done
-	if [ -z "$IPS" ]
-		then IPS=$(dig +short myip.opendns.com @resolver1.opendns.com)
-	fi
+        then
+        for IP_BIN in $IP_BINS
+        do if [ -f $IP_BIN ]
+                then
+                IPS=$($IP_BIN addr | awk '/inet / {print $2}' | grep -vE '^127\.|^192\.168|^10\.|^172\.' | awk -F / '{print $1}' | sort | uniq)
+        fi
+        done
+        if [ -z "$IPS" ]
+                then IPS=$(dig +short myip.opendns.com @resolver1.opendns.com)
+        fi
 else
-	IPS=$(echo "$IPS" | sed 's/[^\.0-9]\+/\n/g')
+        IPS=$(echo "$IPS" | sed 's/[^\.0-9]\+/\n/g')
 fi
 
 RIPS=($(echo "$IPS" | awk -F . '{print$4"."$3"."$2"."$1}'))
@@ -50,41 +50,48 @@ IP_COUNT=${#IPS[*]}
 
 # Debug:
 # echo "IPs: ${IPS[*]}"
-# echo "rIPs: ${RIPS[*]}" 
-# echo "Total IPs: $IP_COUNT
+# echo "rIPs: ${RIPS[*]}"
+# echo "Total IPs: $IP_COUNT"
 
 for ((i=0; i<$IP_COUNT; i++))
-	do
-	for RBL in $RBLS
-	do
-	# echo Querying ${RIPS[i]}.${RBL}
-	if dig +short ${RIPS[i]}.${RBL} | grep -q .
-		then let LISTED[i]=("${LISTED[i]}" + 1)
-	else
-		let LISTED[i]=("${LISTED[i]}" + 0)
-	fi
-	done
-	PERFDATA[i]="'${IPS[i]}'=${LISTED[i]};;;;"
+        do
+        for RBL in $RBLS
+        do
+        # echo Querying ${RIPS[i]}.${RBL}
+        if dig +short ${RIPS[i]}.${RBL} | grep -q .
+                then let LISTED[i]=("${LISTED[i]}" + 1)
+                if ! [[ "${RBL_LISTED[*]}" =~ $RBL ]]
+                        then RBL_LISTED+=($RBL)
+                fi
+        else
+                let LISTED[i]=("${LISTED[i]}" + 0)
+        fi
+        done
+        PERFDATA[i]="'${IPS[i]}'=${LISTED[i]};;;;"
 done
 
 LISTED_COUNT=$(printf '%s\n' "${LISTED[@]}" | grep -cvw 0)
+
+IFS=','
+RBL_LISTED="${RBL_LISTED[*]}"
+unset IFS
+
 if [ -z $IPS ]
-	then
+        then
         STATUS="UNKNOWN: No public IPs found!"
         EXIT=4
 elif [ $LISTED_COUNT -eq 0 ]
-	then
-	STATUS="OK: All ${IP_COUNT} IP(s) have good reputation!"
-	EXIT=0
+        then
+        STATUS="OK: All ${IP_COUNT} IP(s) have good reputation!"
+        EXIT=0
 elif [ $LISTED_COUNT -lt $IP_COUNT ]
-	then
-	STATUS="WARNING: $LISTED_COUNT of $IP_COUNT IP(s) have poor reputation!"
-	EXIT=1
+        then
+        STATUS="WARNING: $LISTED_COUNT of $IP_COUNT IP(s) have poor reputation! Listed in $RBL_LISTED"
+        EXIT=1
 else
-        STATUS="CRITICAL: All $LISTED_COUNT IP(s) have poor reputation!"
+        STATUS="CRITICAL: All $LISTED_COUNT IP(s) have poor reputation! Listed in $RBL_LISTED"
         EXIT=2
 fi
 
 echo "$STATUS | ${PERFDATA[*]}"
 exit $EXIT
-
