@@ -76,20 +76,23 @@ IFS=','
 RBL_LISTED="${RBL_LISTED[*]}"
 unset IFS
 
+RBL_COUNT=$(echo "$RBLS" | grep -c .)
+RBL_LISTED_COUNT=${#RBL_LISTED[@]}
+
 if [ -z $IPS ]
         then
         STATUS="UNKNOWN: No public IPs found!"
         EXIT=4
 elif [ $LISTED_COUNT -eq 0 ]
         then
-        STATUS="OK: All ${IP_COUNT} IP(s) have good reputation!"
+        STATUS="OK: All ${IP_COUNT} IP(s) have good reputation in ${RBL_COUNT} RBLs!"
         EXIT=0
 elif [ $LISTED_COUNT -lt $IP_COUNT ]
         then
-        STATUS="WARNING: $LISTED_COUNT of $IP_COUNT IP(s) have poor reputation! Listed in $RBL_LISTED"
+        STATUS="WARNING: $LISTED_COUNT of $IP_COUNT IP(s) have poor reputation in ${RBL_LISTED_COUNT} RBL(s)! Listed in ${RBL_LISTED}"
         EXIT=1
 else
-        STATUS="CRITICAL: All $LISTED_COUNT IP(s) have poor reputation! Listed in $RBL_LISTED"
+        STATUS="CRITICAL: All $LISTED_COUNT IP(s) have poor reputation in ${RBL_LISTED_COUNT} RBL(s)! Listed in ${RBL_LISTED}"
         EXIT=2
 fi
 
