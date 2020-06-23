@@ -2,7 +2,7 @@
 
 ## Nagios/Icinga plugin to check backup files
 ## Author: Seff Parker
-## Version: 20190909
+## Version: 20200623
 
 DAYS_OLD=32
 DAYS_NEW=7
@@ -48,7 +48,7 @@ if [ $BACKUP_NEW_COUNT -eq 0 ]
 	EXIT=2
 elif [ $BACKUP_OLD_COUNT -gt 0 ]
 	then
-	STATUS="WARNING: $BACKUP_OLD_COUNT .$EXT backups found under $DIR older than $DAYS_OLD days"
+	STATUS="WARNING: $BACKUP_OLD_COUNT .$EXT backups found under $DIR older than $DAYS_OLD days. $BACKUP_NEW_COUNT backups generated in last $DAYS_NEW days"
 	EXIT=1
 else
 	STATUS="OK: $BACKUP_NEW_COUNT .$EXT backups generated under $DIR in last $DAYS_NEW days"
