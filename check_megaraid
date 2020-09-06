@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ## Script to check and report MegaRAID health for Nagios/Icinga Monitoring System
-## Version: 2.1 20191013
+## Version: 2.1.1 20200906
 ## Author: Seff P.
 
 MEGACLIS="/sbin/MegaCli /usr/sbin/MegaCli"
@@ -73,7 +73,7 @@ elif [ "${CRIT_DEVICE}" ]
 	EXIT=2
 elif [ "${WARN_DEVICE}" ]
 	then
-	STATUS="WARNING: Slot #${WARN_DEVICE[*]}, Device ID #${DEVICE_ID[${CRIT_DEVICE}]} reported ${MEC[${WARN_DEVICE}]} media errors. S/N: ${SN[${WARN_DEVICE}]}"
+	STATUS="WARNING: RAID${LEVEL}, Slot #${WARN_DEVICE[*]}, Device ID #${DEVICE_ID[${CRIT_DEVICE}]} reported ${MEC[${WARN_DEVICE}]} media errors. S/N: ${SN[${WARN_DEVICE}]}"
 	EXIT=1
 else
 	IFS=','
