@@ -18,6 +18,13 @@ Binary dependencies: cat, awk, date
 
 ---
 
+### check_iokbps
+Calculate the I/O usage in Kilobytes/second for each block devices and partitions along with PERF_DATA values. Metrices are read from the Kernel variable /proc/diskstats
+
+Binary dependencies: cat, awk, date
+
+---
+
 ### check_megaraid
 Report MegaRAID array status (failed, degraded, critical, media errors, and rebulid progress) along with RAID Level, device slot number and serial number.
 
