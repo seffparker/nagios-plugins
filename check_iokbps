@@ -4,7 +4,7 @@ show_version(){
 echo -e "
 Nagios/Icinga script to check and report Disk I/O usage in kB/s
 Author:  Seff Parker
-Version: v1.0.0 20200924
+Version: v1.0.1 20200924
 "
 }
 
@@ -97,7 +97,7 @@ else
 		   let READ_KBPS[$i]=("${SEC_RD_END[$i]}" - "${SEC_RD_BEGIN[$i]}")/${POLL_TIME}/2
 		   let WRITE_KBPS[$i]=("${SEC_WR_END[$i]}" - "${SEC_WR_BEGIN[$i]}")/${POLL_TIME}/2
 		   SHOW_UTIL[$i]="${DISKS[$i]}: Read=${READ_KBPS[$i]}KB/s, Write=${WRITE_KBPS[$i]}KB/s, "
-		   PERF_DATA[$i]="'${DISKS[$i]}:read'=${READ_KBPS[$i]}KB;$WARN;$CRIT;; '${DISKS[$i]}:write'=${WRITE_KBPS[$i]}KB;$WARN;$CRIT;;"
+		   PERF_DATA[$i]="'${DISKS[$i]}:read'=${READ_KBPS[$i]}KB;$R_WARN;$R_CRIT;; '${DISKS[$i]}:write'=${WRITE_KBPS[$i]}KB;$W_WARN;$W_CRIT;;"
 		   [ ${READ_KBPS[$i]} -ge $R_CRIT ] && CRITICAL=true
 		   [ ${WRITE_KBPS[$i]} -ge $W_CRIT ] && CRITICAL=true
 		   [ ${READ_KBPS[$i]} -ge $R_WARN ] && WARNING=true
