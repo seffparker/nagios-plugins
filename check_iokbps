@@ -4,37 +4,45 @@ show_version(){
 echo -e "
 Nagios/Icinga script to check and report Disk I/O usage in kB/s
 Author:  Seff Parker
-Version: v0.1.0 20200923
+Version: v1.0.0 20200924
 "
 }
 
 
 PREV_DS_SAVE=check_iokbps.save
-WARN=16384 # Default warning level
-CRIT=32768 # Default critical level
+R_WARN=16384 # Default Read warning level
+R_CRIT=32768 # Default Read critical level
+W_WARN=16384 # Default Write warning level
+W_CRIT=32768 # Default Write critical level
 
 # Read custom options from arguments
-while getopts ":w:c:t:V" opt; do
+while getopts ":r:d:w:t:V" opt; do
   case ${opt} in
-    w )
-      WARN=$OPTARG
+    r )
+      R_WARN=$OPTARG
       ;;
-    c )
-      CRIT=$OPTARG
+    d )
+      R_CRIT=$OPTARG
+      ;;
+    w )
+      W_WARN=$OPTARG
+      ;;
+    t )
+      W_CRIT=$OPTARG
       ;;
     V )
 	show_version
 	exit 0
       ;;
     * )
-      echo "Usage: $0 [-w Warning kB/s] [-c Critical kB/S]"
+      echo "Usage: $0 [-r Read warning kB/s] [-d Read critical kB/S] [-w Write warning kB/s] [-t Write critical kB/S]"
       exit 3
       ;;
   esac
 done
 shift $((OPTIND -1))
 
-if [ $WARN -gt $CRIT ]
+if [[ $R_WARN -gt $R_CRIT ]] || [[ $W_WARN -gt $W_CRIT ]]
 	then
 	STATUS="UNKNOWN: Warning level should be lower than critical"
 	EXIT=3
@@ -76,7 +84,7 @@ else
 		DISK_NOS=${#DISKS[*]}
 
 		# Debug:
-		# echo "Arguments: -w $WARN -c $CRIT -t $POLL_TIME"
+		# echo "Arguments: -r $R_WARN -d $R_CRIT -w $W_WARN -t $W_CRIT"
 		# echo "Number of disks: $DISK_NOS"
 		# echo "Disks: ${DISKS[*]}"
 		# echo "Sector Read begin: ${SEC_RD_BEGIN[*]}"
@@ -90,10 +98,10 @@ else
 		   let WRITE_KBPS[$i]=("${SEC_WR_END[$i]}" - "${SEC_WR_BEGIN[$i]}")/${POLL_TIME}/2
 		   SHOW_UTIL[$i]="${DISKS[$i]}: Read=${READ_KBPS[$i]}KB/s, Write=${WRITE_KBPS[$i]}KB/s, "
 		   PERF_DATA[$i]="'${DISKS[$i]}:read'=${READ_KBPS[$i]}KB;$WARN;$CRIT;; '${DISKS[$i]}:write'=${WRITE_KBPS[$i]}KB;$WARN;$CRIT;;"
-		   [ ${READ_KBPS[$i]} -ge $CRIT ] && CRITICAL=true
-		   [ ${WRITE_KBPS[$i]} -ge $CRIT ] && CRITICAL=true
-		   [ ${READ_KBPS[$i]} -ge $WARN ] && WARNING=true
-		   [ ${WRITE_KBPS[$i]} -ge $WARN ] && WARNING=true
+		   [ ${READ_KBPS[$i]} -ge $R_CRIT ] && CRITICAL=true
+		   [ ${WRITE_KBPS[$i]} -ge $W_CRIT ] && CRITICAL=true
+		   [ ${READ_KBPS[$i]} -ge $R_WARN ] && WARNING=true
+		   [ ${WRITE_KBPS[$i]} -ge $W_WARN ] && WARNING=true
 		done
 		STATS="${SHOW_UTIL[*]}| ${PERF_DATA[*]}"
 		if [ $CRITICAL ]
