@@ -4,7 +4,7 @@ show_version(){
 echo -e "
 Nagios/Icinga script to check and report Disk I/O usage in kB/s
 Author:  Seff Parker
-Version: v1.0.1 20200924
+Version: v1.0.2 20200927
 "
 }
 
@@ -16,18 +16,18 @@ W_WARN=16384 # Default Write warning level
 W_CRIT=32768 # Default Write critical level
 
 # Read custom options from arguments
-while getopts ":r:d:w:t:V" opt; do
+while getopts ":r:R:w:W:V" opt; do
   case ${opt} in
     r )
       R_WARN=$OPTARG
       ;;
-    d )
+    R )
       R_CRIT=$OPTARG
       ;;
     w )
       W_WARN=$OPTARG
       ;;
-    t )
+    W )
       W_CRIT=$OPTARG
       ;;
     V )
@@ -35,7 +35,7 @@ while getopts ":r:d:w:t:V" opt; do
 	exit 0
       ;;
     * )
-      echo "Usage: $0 [-r Read warning kB/s] [-d Read critical kB/S] [-w Write warning kB/s] [-t Write critical kB/S]"
+      echo "Usage: $0 [-r Read warning kB/s] [-R Read critical kB/S] [-w Write warning kB/s] [-W Write critical kB/S]"
       exit 3
       ;;
   esac
