@@ -4,7 +4,7 @@ show_version(){
 echo -e "
 Nagios/Icinga script to check and report Disk I/O usage in kB/s
 Author:  Seff Parker
-Version: v1.0.2 20200927
+Version: v1.0.3 20200927
 "
 }
 
@@ -94,23 +94,24 @@ else
 
 		for ((i=0; i<$DISK_NOS; i++))
 		do
-		   let READ_KBPS[$i]=("${SEC_RD_END[$i]}" - "${SEC_RD_BEGIN[$i]}")/${POLL_TIME}/2
-		   let WRITE_KBPS[$i]=("${SEC_WR_END[$i]}" - "${SEC_WR_BEGIN[$i]}")/${POLL_TIME}/2
-		   SHOW_UTIL[$i]="${DISKS[$i]}: Read=${READ_KBPS[$i]}KB/s, Write=${WRITE_KBPS[$i]}KB/s, "
-		   PERF_DATA[$i]="'${DISKS[$i]}:read'=${READ_KBPS[$i]}KB;$R_WARN;$R_CRIT;; '${DISKS[$i]}:write'=${WRITE_KBPS[$i]}KB;$W_WARN;$W_CRIT;;"
-		   [ ${READ_KBPS[$i]} -ge $R_CRIT ] && CRITICAL=true
-		   [ ${WRITE_KBPS[$i]} -ge $W_CRIT ] && CRITICAL=true
-		   [ ${READ_KBPS[$i]} -ge $R_WARN ] && WARNING=true
-		   [ ${WRITE_KBPS[$i]} -ge $W_WARN ] && WARNING=true
+			let READ_KBPS[$i]=("${SEC_RD_END[$i]}" - "${SEC_RD_BEGIN[$i]}")/${POLL_TIME}/2
+			let WRITE_KBPS[$i]=("${SEC_WR_END[$i]}" - "${SEC_WR_BEGIN[$i]}")/${POLL_TIME}/2
+			SHOW_UTIL[$i]="${DISKS[$i]}: Read=${READ_KBPS[$i]}KB/s, Write=${WRITE_KBPS[$i]}KB/s, "
+			PERF_DATA[$i]="'${DISKS[$i]}:read'=${READ_KBPS[$i]}KB;$R_WARN;$R_CRIT;; '${DISKS[$i]}:write'=${WRITE_KBPS[$i]}KB;$W_WARN;$W_CRIT;;"
+			[ ${READ_KBPS[$i]} -ge $R_CRIT ] && CRIT_DEV+=("${DISKS[$i]}:read")
+			[ ${WRITE_KBPS[$i]} -ge $W_CRIT ] && CRIT_DEV+=("${DISKS[$i]}:write")
+			[ ${READ_KBPS[$i]} -ge $R_WARN ] && WARN_DEV+=("${DISKS[$i]}:read")
+			[ ${WRITE_KBPS[$i]} -ge $W_WARN ] && WARN_DEV+=("${DISKS[$i]}:write")
 		done
 		STATS="${SHOW_UTIL[*]}| ${PERF_DATA[*]}"
-		if [ $CRITICAL ]
+		IFS=','
+		if [[ "${CRIT_DEV[*]}" ]]
 			then
-			STATUS="CRITICAL: Disk Read/Write is very high! - "
+			STATUS="CRITICAL: ${CRIT_DEV[*]} is very high! - "
 			EXIT=2
-		elif [ $WARNING ]
+		elif [[ "${WARN_DEV[*]}" ]]
 			then
-			STATUS="WARNING: Disk Read/Write high! - "
+			STATUS="WARNING: ${WARN_DEV[*]} is high! - "
 			EXIT=1
 		else
 			STATUS="OK: Disk Read/Write usage is normal! - "
