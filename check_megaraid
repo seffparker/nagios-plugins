@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ## Script to check and report MegaRAID health for Nagios/Icinga Monitoring System
-## Version: 2.1.1 20200906
+## Version: 2.2.0 20200928
 ## Author: Seff P.
 
 MEGACLIS="/sbin/MegaCli /usr/sbin/MegaCli"
@@ -34,11 +34,19 @@ if ! which sudo &> /dev/null
 fi
 
 RAID_OUTPUT=$(sudo $MEGACLI -LDInfo -Lall -aALL -NoLog && sudo $MEGACLI -PdList -aALL -NoLog)
-RAID_STATE=$(echo "$RAID_OUTPUT" | awk '/^State/ {print $NF}' | uniq)
+RAID_STATE=($(echo "$RAID_OUTPUT" | awk '/^State/ {print $NF}'))
+LEVELS=($(echo "$RAID_OUTPUT"| grep -i "RAID Level" | grep -o [0-9]))
+VIRT_DISKS=($(echo "$RAID_OUTPUT"| awk '/^Virtual Disk/ {print $3}'))
+P=0; S=1; Q=2;
+for i in ${!VIRT_DISKS[*]}
+	do
+	let LEVEL=(${LEVELS[$P]}+${LEVELS[$S]}*${LEVELS[$Q]})
+	ARRAY_STATE+="RAID${LEVEL} on vd${VIRT_DISKS[$i]} is ${RAID_STATE[$i]}, "
+	((S+=3)); ((P+=3)); ((Q+=3));
+done
+
 SLOT_IDS=$(echo "$RAID_OUTPUT" | awk '/Slot Number/ {print $NF}')
 ENC_ID=$(echo "$RAID_OUTPUT" | awk '/Enclosure Device ID/ {print $NF;exit}')
-LEVEL=($(echo "$RAID_OUTPUT"| grep -i "RAID Level" | grep -o [0-9]))
-let LEVEL=(${LEVEL[0]}+${LEVEL[1]}*${LEVEL[1]})
 
 for SLOT_ID in ${SLOT_IDS}
 	do
@@ -47,37 +55,39 @@ for SLOT_ID in ${SLOT_IDS}
 	SN[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk '/Inquiry Data/ {print $3}')
 	DRIVE_STATE[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk -F ":" '/Firmware state/ {print $2}')
 	MEC[$SLOT_ID]=$(echo "$DEVICE_OUTPUT" | awk '/Count: / && !/^Other/ {SUM += $4} END {print SUM}')
+
 	if [[ "${DRIVE_STATE[$SLOT_ID]}" =~ Rebuild ]]
 		then
 		REBUILD_STATUS=$(sudo $MEGACLI -PDRbld -ShowProg -PhysDrv [${ENC_ID}:${SLOT_ID}] -aALL -NoLog | grep -i "Rebuild")
-		REBUILD_DEVICE=$SLOT_ID
+		REBUILD_DEVICES+="${REBUILD_STATUS}, Sn# ${SN[$SLOT_ID]}, "
 	elif [[ "${DRIVE_STATE[$SLOT_ID]}" =~ Online ]]
 		then
 		OK_DEVICE[$SLOT_ID]=$SLOT_ID
 	else
-		CRIT_DEVICE=$SLOT_ID
+		CRIT_DEVICES+="Slot# ${SLOT_ID}, Device# ${DEVICE_ID[$SLOT_ID]}, Sn# ${SN[$SLOT_ID]} is${DRIVE_STATE[$SLOT_ID]}, "
 	fi
+
 	if [[ ${MEC[$SLOT_ID]} != 0 ]]
 		then
-		WARN_DEVICE=$SLOT_ID
+		WARN_DEVICES+="Slot# ${SLOT_ID}, Device# ${DEVICE_ID[$SLOT_ID]}, Sn# ${SN[$SLOT_ID]} reported ${MEC[$SLOT_ID]} media errors, "
 	fi
 done
 
-if [ "$REBUILD_DEVICE" ]
+if [ "${REBUILD_DEVICES}" ]
 	then
-	STATUS="WARNING: ${REBUILD_STATUS} S/N: ${SN[${REBUILD_DEVICE}]}"
+	STATUS="WARNING: ${ARRAY_STATE}- ${REBUILD_DEVICES}"
 	EXIT=1
-elif [ "${CRIT_DEVICE}" ]
+elif [ "${CRIT_DEVICES}" ]
 	then
-	STATUS="CRITICAL: RAID${LEVEL} is $RAID_STATE. Slot #${CRIT_DEVICE}, Device ID #${DEVICE_ID[${CRIT_DEVICE}]} is${DRIVE_STATE[${CRIT_DEVICE}]}. S/N: ${SN[${CRIT_DEVICE}]}"
+	STATUS="CRITICAL: ${ARRAY_STATE}- ${CRIT_DEVICES}"
 	EXIT=2
-elif [ "${WARN_DEVICE}" ]
+elif [ "${WARN_DEVICES}" ]
 	then
-	STATUS="WARNING: RAID${LEVEL}, Slot #${WARN_DEVICE[*]}, Device ID #${DEVICE_ID[${CRIT_DEVICE}]} reported ${MEC[${WARN_DEVICE}]} media errors. S/N: ${SN[${WARN_DEVICE}]}"
+	STATUS="WARNING: ${ARRAY_STATE}- ${WARN_DEVICES}"
 	EXIT=1
 else
 	IFS=','
-	STATUS="OK: RAID${LEVEL} is $RAID_STATE. All ${#OK_DEVICE[*]} disks are healthy. S/N: ${SN[*]}"
+	STATUS="OK: ${ARRAY_STATE}- All ${#OK_DEVICE[*]} disks are healthy. S/N: ${SN[*]}"
 	EXIT=0
 fi
 echo "$STATUS"
