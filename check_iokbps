@@ -4,15 +4,15 @@ show_version(){
 echo -e "
 Nagios/Icinga script to check and report Disk I/O usage in kB/s
 Author:  Seff Parker
-Version: v1.1.0 20200929
+Version: v1.1.1 20200929
 "
 }
 
 
 PREV_DS_SAVE=check_iokbps.save
 PREV_STATUS=check_iokbps.status
-R_WARN=16384 # Default Read warning level
-R_CRIT=32768 # Default Read critical level
+R_WARN=32768 # Default Read warning level
+R_CRIT=65536 # Default Read critical level
 W_WARN=16384 # Default Write warning level
 W_CRIT=32768 # Default Write critical level
 
@@ -125,11 +125,14 @@ else
 fi
 
 echo -n "$CURR_DS" > $PREV_DS_SAVE
-echo "${STATUS}${STATS}"
+
 if [[ $EXIT -eq 3 ]] && PREV_EXIT=$(cat $PREV_STATUS 2> /dev/null)
 	then
 	echo $EXIT > $PREV_STATUS
-	exit $PREV_EXIT
+	EXIT=$PREV_EXIT
+else
+	echo $EXIT > $PREV_STATUS
 fi
-echo $EXIT > $PREV_STATUS
+
+echo "${STATUS}${STATS}"
 exit $EXIT
