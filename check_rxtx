@@ -3,9 +3,10 @@
 ## Icinga/Nagios plugin to report RX,TX bytes for each interfaces
 
 ## Author:  Seff Parker
-## Version: v1.2 20190402
+## Version: v1.3.0 20200929
 
 PREV_RXTX_SAVE=check_rxtx.save
+PREV_STATUS=check_rxtx.status
 
 if [ ! -s $PREV_RXTX_SAVE ]
 	then
@@ -46,6 +47,14 @@ else
 fi
 
 awk '!/lo:/ && !/Inter/ && !/face/ && !/tap/ && !/tun/ && !/dummy/' /proc/net/dev > $PREV_RXTX_SAVE
+
+if [[ $EXIT -eq 3 ]] && PREV_EXIT=$(cat $PREV_STATUS 2> /dev/null)
+	then
+	echo $EXIT > $PREV_STATUS
+	EXIT=$PREV_EXIT
+else
+	echo $EXIT > $PREV_STATUS
+fi
+
 echo "$STATUS"
 exit $EXIT
-
