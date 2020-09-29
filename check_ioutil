@@ -4,12 +4,13 @@ show_version(){
 echo -e "
 Nagios/Icinga script to check and report Disk I/O utilization in percentage
 Author:  Seff Parker
-Version: v2.1 build 20190421
+Version: v2.2.0 build 20200929
 "
 }
 
 
 PREV_DS_SAVE=check_ioutil.save
+PREV_STATUS=check_ioutil.status
 WARN=90 # Default warning level
 CRIT=99 # Default critical level
 
@@ -34,6 +35,9 @@ while getopts ":w:c:t:V" opt; do
 done
 shift $((OPTIND -1))
 
+PART=$(ls -l /dev/disk/by-uuid/* | awk -F "/" '!/\/loop/ && !/\/ram/ && !/\/sr/ && !/\/fd/ {printf $NF"|"}')
+CURR_DS=$(cat /proc/diskstats 2> /dev/null | grep -wE "${PART}#" | sort -k 3)
+
 if [ $WARN -gt $CRIT ]
 	then
 	STATUS="UNKNOWN: Warning level should be lower than critical"
@@ -47,8 +51,6 @@ elif [ ! -s $PREV_DS_SAVE ]
 	STATUS="UNKNOWN: Cannot read disk stats from Kernel"
 	EXIT=3
 else
-	PART=$(ls -l /dev/disk/by-uuid/* | awk -F "/" '!/\/loop/ && !/\/ram/ && !/\/sr/ && !/\/fd/ {printf $NF"|"}')
-	CURR_DS=$(cat /proc/diskstats 2> /dev/null | grep -wE "${PART}#" | sort -k 3)
 	PREV_DS=$(cat $PREV_DS_SAVE)
 	CURR_LC=$(echo "$CURR_DS" | wc -l)
 	CURR_CC=$(echo "$CURR_DS" | wc -c)
@@ -99,6 +101,12 @@ else
 	fi
 fi
 
-echo "$CURR_DS" > $PREV_DS_SAVE
+echo -n "$CURR_DS" > $PREV_DS_SAVE
 echo "${STATUS}${STATS}"
+if [[ $EXIT -eq 3 ]] && PREV_EXIT=$(cat $PREV_STATUS 2> /dev/null)
+	then
+	echo $EXIT > $PREV_STATUS
+	exit $PREV_EXIT
+fi
+echo $EXIT > $PREV_STATUS
 exit $EXIT
