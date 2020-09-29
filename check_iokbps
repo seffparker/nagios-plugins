@@ -4,12 +4,13 @@ show_version(){
 echo -e "
 Nagios/Icinga script to check and report Disk I/O usage in kB/s
 Author:  Seff Parker
-Version: v1.0.3 20200927
+Version: v1.1.0 20200929
 "
 }
 
 
 PREV_DS_SAVE=check_iokbps.save
+PREV_STATUS=check_iokbps.status
 R_WARN=16384 # Default Read warning level
 R_CRIT=32768 # Default Read critical level
 W_WARN=16384 # Default Write warning level
@@ -19,28 +20,31 @@ W_CRIT=32768 # Default Write critical level
 while getopts ":r:R:w:W:V" opt; do
   case ${opt} in
     r )
-      R_WARN=$OPTARG
-      ;;
+	R_WARN=$OPTARG
+	;;
     R )
-      R_CRIT=$OPTARG
-      ;;
+	R_CRIT=$OPTARG
+	;;
     w )
-      W_WARN=$OPTARG
-      ;;
+	W_WARN=$OPTARG
+	;;
     W )
-      W_CRIT=$OPTARG
-      ;;
+	W_CRIT=$OPTARG
+	;;
     V )
 	show_version
-	exit 0
-      ;;
+	exit 3
+	;;
     * )
-      echo "Usage: $0 [-r Read warning kB/s] [-R Read critical kB/S] [-w Write warning kB/s] [-W Write critical kB/S]"
-      exit 3
+	echo "Usage: $0 [-r Read warning kB/s] [-R Read critical kB/s] [-w Write warning kB/s] [-W Write critical kB/s]"
+	exit 3
       ;;
   esac
 done
 shift $((OPTIND -1))
+
+PART=$(ls -l /dev/disk/by-uuid/* | awk -F "/" '!/\/loop/ && !/\/ram/ && !/\/sr/ && !/\/fd/ {printf $NF"|"}')
+CURR_DS=$(cat /proc/diskstats 2> /dev/null | grep -wE "${PART}#" | sort -k 3)
 
 if [[ $R_WARN -gt $R_CRIT ]] || [[ $W_WARN -gt $W_CRIT ]]
 	then
@@ -120,6 +124,12 @@ else
 	fi
 fi
 
-echo "$CURR_DS" > $PREV_DS_SAVE
+echo -n "$CURR_DS" > $PREV_DS_SAVE
 echo "${STATUS}${STATS}"
+if [[ $EXIT -eq 3 ]] && PREV_EXIT=$(cat $PREV_STATUS 2> /dev/null)
+	then
+	echo $EXIT > $PREV_STATUS
+	exit $PREV_EXIT
+fi
+echo $EXIT > $PREV_STATUS
 exit $EXIT
