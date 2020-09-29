@@ -4,7 +4,7 @@ show_version(){
 echo -e "
 Nagios/Icinga script to check and report Disk I/O utilization in percentage
 Author:  Seff Parker
-Version: v2.2.0 build 20200929
+Version: v2.2.1 build 20200929
 "
 }
 
@@ -102,11 +102,14 @@ else
 fi
 
 echo -n "$CURR_DS" > $PREV_DS_SAVE
-echo "${STATUS}${STATS}"
+
 if [[ $EXIT -eq 3 ]] && PREV_EXIT=$(cat $PREV_STATUS 2> /dev/null)
 	then
 	echo $EXIT > $PREV_STATUS
-	exit $PREV_EXIT
+	EXIT=$PREV_EXIT
+else
+	echo $EXIT > $PREV_STATUS
 fi
-echo $EXIT > $PREV_STATUS
+
+echo "${STATUS}${STATS}"
 exit $EXIT
