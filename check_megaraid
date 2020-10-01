@@ -69,7 +69,7 @@ for SLOT_ID in ${SLOT_IDS}
 
 	if [[ ${MEC[$SLOT_ID]} != 0 ]]
 		then
-		WARN_DEVICES+="Slot# ${SLOT_ID}, Device# ${DEVICE_ID[$SLOT_ID]}, Sn# ${SN[$SLOT_ID]} reported ${MEC[$SLOT_ID]} media errors, "
+		WARN_DEVICES+="Slot# ${SLOT_ID}, Device# ${DEVICE_ID[$SLOT_ID]}, Sn# ${SN[$SLOT_ID]} has reported ${MEC[$SLOT_ID]} media errors, "
 	fi
 done
 
