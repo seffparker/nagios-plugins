@@ -3,7 +3,7 @@
 ## Nagios/Icinga plugin to check package database integrity
 
 ## Author: Seff Parker
-## Version: 20200413
+## Version: 2.0.1 20201001
 
 WARN_DAYS=60
 
@@ -19,10 +19,10 @@ if which rpm &> /dev/null
                 LAST_PKG_UPED_TS=$(date -d "$LAST_PKG_UPED" +%s)
                 CURRENT_TS=$(date +%s)
                 let LAST_PKG_UPED_AGO=$CURRENT_TS-$LAST_PKG_UPED_TS
-                let UPED_DAYS="${LAST_PKG_UPED_AGO} / 86400"
+		let UPED_DAYS="${LAST_PKG_UPED_AGO} / 86400"
                 if [[ ${LAST_PKG_UPED_AGO} -gt ${WARN_SECS} ]]
                         then
-                        STATUS="WARNING: Packages are not updated for last $UPED_DAYS days"
+                        STATUS="WARNING: RPM packages are not updated for last $UPED_DAYS days"
                         EXIT=1
                 else
                         STATUS="OK: RPM Database verification succeeded. Last updated $UPED_DAYS days ago"
@@ -32,26 +32,26 @@ if which rpm &> /dev/null
                 EXIT=2
         fi
 elif which dpkg &> /dev/null
-        then
-        DPKG_VERIFY=$(dpkg --audit)
-        EXIT=$?
-        if [[ $EXIT = 0 ]]
-                then
-                LAST_PKG_UPED_TS=$(date -r /var/lib/dpkg/status +%s)
-                CURRENT_TS=$(date +%s)
-                let LAST_PKG_UPED_AGO=$CURRENT_TS-$LAST_PKG_UPED_TS
-                let UPED_DAYS="${LAST_PKG_UPED_AGO} / 86400"
-                if [[ ${LAST_PKG_UPED_AGO} -gt ${WARN_SECS} ]]
-                        then
-                        STATUS="WARNING: Packages are not updated for last $UPED_DAYS days"
-                        EXIT=1
-                else
-                        STATUS="OK: DPKG Database verification succeeded. Last updated $UPED_DAYS days ago"
-                fi
-        else
-                STATUS="CRITICAL: $DPKG_VERIFY"
-                EXIT=2
-        fi
+	then
+	DPKG_VERIFY=$(dpkg --audit)
+	EXIT=$?
+	if [[ $EXIT = 0 ]]
+		then
+		LAST_PKG_UPED_TS=$(date -r /var/lib/dpkg/status +%s)
+		CURRENT_TS=$(date +%s)
+		let LAST_PKG_UPED_AGO=$CURRENT_TS-$LAST_PKG_UPED_TS
+		let UPED_DAYS="${LAST_PKG_UPED_AGO} / 86400"
+		if [[ ${LAST_PKG_UPED_AGO} -gt ${WARN_SECS} ]]
+			then
+			STATUS="WARNING: Debian packages are not updated for last $UPED_DAYS days"
+			EXIT=1
+		else
+			STATUS="OK: DPKG Database verification succeeded. Last updated $UPED_DAYS days ago"
+		fi
+	else
+		STATUS="CRITICAL: $DPKG_VERIFY"
+		EXIT=2
+	fi
 else
         STATUS="UNKNOWN: Couldn't fetch package information"
         EXIT=3
