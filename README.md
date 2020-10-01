@@ -30,6 +30,14 @@ Report MegaRAID array status (failed, degraded, critical, media errors, and rebu
 
 Binary dependencies: MegaCLI, echo, grep, sort, uniq, sed, sudo (optional)
 
+#### Sample Outputs:
+```
+OK: RAID5 on vd0 is Optimal, RAID0 on vd1 is Optimal, - All 4 disks are healthy. S/N: PHYF9345021Q960CGN,PHYF934501RB960CGN,BTYF014304Y9960CGN,PHYF934501Z7960CGN
+```
+```
+WARNING: RAID5 on vd0 is Optimal, - Slot# 0, Device# 5, Sn# K5HALMPD reported 2129 media errors, Slot# 1, Device# 4, Sn# K5HALH6D reported 80 media errors,
+```
+
 ---
 
 ### check_mysql_conn
@@ -65,7 +73,13 @@ Binary dependencies: awk, cat, echo, date
 Report SMART health status for physical disks including those attached to a RAID array along with device serial number. The script attempt to auto-detect device IDs and raid type. If it failes, you may need to manually specify via aurguments.
 
 Binary dependencies: smartctl, echo, awk, sort, uniq, sudo (optional)
-
+#### Sample Outputs:
+```
+OK: All 4 Hard drive(s) looks healthy! Serial #: PHYF9345021Q960CGN PHYF934501RB960CGN BTYF014304Y9960CGN PHYF934501Z7960CGN
+```
+```
+WARNING: 2 of 3 drive has 2219 Media Errors most recent at 932 hours ago! Serial #: K5HALH6D K5HALMPD
+```
 ---
 
 ### check_backup
