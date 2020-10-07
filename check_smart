@@ -2,12 +2,13 @@
 
 ## Nagios/Icinga script to check S.M.A.R.T. health status of physical disks
 ## Author:  Seff Parker
-## Version: v3.1 build 20190801
+## Version: v3.2.0 build 20201007
 
 CMD="/usr/sbin/smartctl"
 RAID_TYPE="auto"
 DEVICE_IDS="auto"
 DRIVES="auto"
+IGNORE_ERROR_AGO=96 # Ingore Media Errors older than 1 week
 
 shopt -s nocasematch
 
@@ -142,7 +143,7 @@ elif [ "${WARN_SN[*]}" ]
 	then
 	STATUS="WARNING: ${#WARN_SN[*]} of ${#ALL_SN[*]} drive health not looks good! Serial #: ${WARN_SN[*]}"
 	EXIT=1
-elif [ "${MEDIA_ERR_SN[*]}" ]
+elif [ "${MEDIA_ERR_SN[*]}" ] && [ ${ERROR_AGO} -le ${IGNORE_ERROR_AGO} ]
         then
         STATUS="WARNING: ${#MEDIA_ERR_SN[*]} of ${#ALL_SN[*]} drive has $MEC_SUM Media Errors most recent at $ERROR_AGO hours ago! Serial #: ${MEDIA_ERR_SN[*]}"
         EXIT=1
