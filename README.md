@@ -64,7 +64,7 @@ Report RPM/DPKG database intergiry and last package update/install time.
 Binary dependencies: rpm/dpkg, yum/apt, date, awk, head
 #### Sample Outputs:
 ```
-OK: DPKG Database verification succeeded. Last updated 29 days ago
+OK: RPM database OK. 2 packages can be updated. Last updated 7 days ago
 ```
 ```
 WARNING: 34 APT packages can be updated. Last updated 56 days ago
