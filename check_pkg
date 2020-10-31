@@ -3,7 +3,7 @@
 ## Nagios/Icinga plugin to check package database integrity
 
 ## Author: Seff Parker
-## Version: 3.0.0 20201031
+## Version: 3.0.1 20201031
 
 WARN_PKG=30
 CRIT_PKG=100
@@ -46,11 +46,11 @@ if which rpm &> /dev/null
 		let UPED_DAYS="${LAST_PKG_UPED_AGO} / 86400"
 		if [[ ${PKG_UPS_COUNT} -ge ${CRIT_PKG} ]]
 			then
-			STATUS="CRITICAL: ${PKG_UPS_COUNT} YUM packages can be updated"
+			STATUS="CRITICAL: ${PKG_UPS_COUNT} YUM packages can be updated. Last updated ${UPED_DAYS} days ago"
 			EXIT=2
 		elif [[ ${PKG_UPS_COUNT} -ge ${WARN_PKG} ]]
 			then
-			STATUS="WARNING: ${PKG_UPS_COUNT} YUM packages can be updated"
+			STATUS="WARNING: ${PKG_UPS_COUNT} YUM packages can be updated. Last updated ${UPED_DAYS} days ago"
 			EXIT=1
 		elif [[ ${LAST_PKG_UPED_AGO} -gt ${WARN_SECS} ]]
                         then
@@ -76,11 +76,11 @@ elif which dpkg &> /dev/null
 		let UPED_DAYS="${LAST_PKG_UPED_AGO} / 86400"
 		if [[ ${PKG_UPS_COUNT} -ge ${CRIT_PKG} ]]
 			then
-			STATUS="CRITICAL: ${PKG_UPS_COUNT} APT packages can be updated"
+			STATUS="CRITICAL: ${PKG_UPS_COUNT} APT packages can be updated. Last updated ${UPED_DAYS} days ago"
 			EXIT=2
 		elif [[ ${PKG_UPS_COUNT} -ge ${WARN_PKG} ]]
 			then
-			STATUS="WARNING: ${PKG_UPS_COUNT} APT packages can be updated"
+			STATUS="WARNING: ${PKG_UPS_COUNT} APT packages can be updated. Last updated ${UPED_DAYS} days ago"
 			EXIT=1
 		elif [[ ${LAST_PKG_UPED_AGO} -gt ${WARN_SECS} ]]
 			then
