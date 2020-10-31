@@ -87,7 +87,7 @@ elif which dpkg &> /dev/null
 			STATUS="WARNING: Debian packages are not updated for last $UPED_DAYS days"
 			EXIT=1
 		else
-			STATUS="OK: DPKG Database OK. ${PKG_UPS_COUNT} YUM packages can be updated. Last updated ${UPED_DAYS} days ago"
+			STATUS="OK: DPKG Database OK. ${PKG_UPS_COUNT} APT packages can be updated. Last updated ${UPED_DAYS} days ago"
 		fi
 	else
 		STATUS="CRITICAL: $DPKG_VERIFY"
