@@ -61,13 +61,16 @@ OK: MySQL 5.7.31-log is UP for 7 days! Threads: 3, Q/s: 1968
 ### check_pkg
 Report RPM/DPKG database intergiry and last package update/install time.
 
-Binary dependencies: rpm / dpkg, date, awk, head
+Binary dependencies: rpm/dpkg, yum/apt, date, awk, head
 #### Sample Outputs:
 ```
 OK: DPKG Database verification succeeded. Last updated 29 days ago
 ```
 ```
-WARNING: RPM packages are not updated for last 60 days
+WARNING: 34 APT packages can be updated. Last updated 56 days ago
+```
+```
+CRITICAL: 296 YUM packages can be updated. Last updated 86 days ago
 ```
 ---
 
