@@ -3,11 +3,34 @@
 ## Nagios/Icinga plugin to check package database integrity
 
 ## Author: Seff Parker
-## Version: 2.0.1 20201001
+## Version: 3.0.0 20201031
 
-WARN_DAYS=60
+WARN_PKG=30
+CRIT_PKG=100
+WARN_DAYS=90
 
-let WARN_SECS="$WARN_DAYS * 86400"
+# Read custom options from arguments
+while getopts ":w:c:d:" opt; do
+  case ${opt} in
+    w )
+	WARN_PKG=$OPTARG
+	;;
+    c )
+	CRIT_PKG=$OPTARG
+	;;
+    d )
+	WARN_DAYS=$OPTARG
+	;;
+    * )
+	echo "Usage: $0 [-w Packages warning] [-c Packages critical [-d Warning days]"
+	exit 3
+      ;;
+  esac
+done
+shift $((OPTIND -1))
+
+
+let WARN_SECS="${WARN_DAYS} * 86400"
 
 if which rpm &> /dev/null
         then
@@ -15,17 +38,26 @@ if which rpm &> /dev/null
         EXIT=$?
         if [[ $EXIT = 0 ]]
                 then
+		PKG_UPS_COUNT=$(yum list updates 2> /dev/null | awk '/^Updated Packages/,EOF' | grep -c .)
                 LAST_PKG_UPED=$(rpm -qa --last | head -1 | awk '{printf $2" "$3" "$4" "$5" "$6" "$7}')
                 LAST_PKG_UPED_TS=$(date -d "$LAST_PKG_UPED" +%s)
                 CURRENT_TS=$(date +%s)
                 let LAST_PKG_UPED_AGO=$CURRENT_TS-$LAST_PKG_UPED_TS
 		let UPED_DAYS="${LAST_PKG_UPED_AGO} / 86400"
-                if [[ ${LAST_PKG_UPED_AGO} -gt ${WARN_SECS} ]]
+		if [[ ${PKG_UPS_COUNT} -ge ${CRIT_PKG} ]]
+			then
+			STATUS="CRITICAL: ${PKG_UPS_COUNT} YUM packages can be updated"
+			EXIT=2
+		elif [[ ${PKG_UPS_COUNT} -ge ${WARN_PKG} ]]
+			then
+			STATUS="WARNING: ${PKG_UPS_COUNT} YUM packages can be updated"
+			EXIT=1
+		elif [[ ${LAST_PKG_UPED_AGO} -gt ${WARN_SECS} ]]
                         then
                         STATUS="WARNING: RPM packages are not updated for last $UPED_DAYS days"
                         EXIT=1
                 else
-                        STATUS="OK: RPM Database verification succeeded. Last updated $UPED_DAYS days ago"
+                        STATUS="OK: RPM database OK. ${PKG_UPS_COUNT} YUM packages can be updated. Last updated ${UPED_DAYS} days ago"
                 fi
         else
                 STATUS="CRITICAL: $RPM_VERIFY"
@@ -37,16 +69,25 @@ elif which dpkg &> /dev/null
 	EXIT=$?
 	if [[ $EXIT = 0 ]]
 		then
+		PKG_UPS_COUNT=$(apt list --upgradeable 2> /dev/null | grep -vc "^Listing")
 		LAST_PKG_UPED_TS=$(date -r /var/lib/dpkg/status +%s)
 		CURRENT_TS=$(date +%s)
 		let LAST_PKG_UPED_AGO=$CURRENT_TS-$LAST_PKG_UPED_TS
 		let UPED_DAYS="${LAST_PKG_UPED_AGO} / 86400"
-		if [[ ${LAST_PKG_UPED_AGO} -gt ${WARN_SECS} ]]
+		if [[ ${PKG_UPS_COUNT} -ge ${CRIT_PKG} ]]
+			then
+			STATUS="CRITICAL: ${PKG_UPS_COUNT} APT packages can be updated"
+			EXIT=2
+		elif [[ ${PKG_UPS_COUNT} -ge ${WARN_PKG} ]]
+			then
+			STATUS="WARNING: ${PKG_UPS_COUNT} APT packages can be updated"
+			EXIT=1
+		elif [[ ${LAST_PKG_UPED_AGO} -gt ${WARN_SECS} ]]
 			then
 			STATUS="WARNING: Debian packages are not updated for last $UPED_DAYS days"
 			EXIT=1
 		else
-			STATUS="OK: DPKG Database verification succeeded. Last updated $UPED_DAYS days ago"
+			STATUS="OK: DPKG Database OK. ${PKG_UPS_COUNT} YUM packages can be updated. Last updated ${UPED_DAYS} days ago"
 		fi
 	else
 		STATUS="CRITICAL: $DPKG_VERIFY"
