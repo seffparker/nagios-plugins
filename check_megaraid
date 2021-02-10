@@ -1,11 +1,23 @@
 #!/bin/bash
 
 ## Script to check and report MegaRAID health for Nagios/Icinga Monitoring System
-## Version: 2.2.1 20201001
+## Version: 2.3.0 20210210
 ## Author: Seff P.
 
 MEGACLIS="/sbin/MegaCli /usr/sbin/MegaCli"
 
+# Read options from arguments
+while getopts ":m:" opt; do
+  case ${opt} in
+    m )
+	MEC_THRESHOLD=$OPTARG
+	;;
+    * )
+	echo -e "Usage: $0 [-m  Media Error Count threshold]"
+	exit 3
+	;;
+  esac
+done
 
 if ! grep -q megaraid /proc/bus/pci/devices
 	then
@@ -66,8 +78,8 @@ for SLOT_ID in ${SLOT_IDS}
 	else
 		CRIT_DEVICES+="Slot# ${SLOT_ID}, Device# ${DEVICE_ID[$SLOT_ID]}, Sn# ${SN[$SLOT_ID]} is${DRIVE_STATE[$SLOT_ID]}, "
 	fi
-
-	if [[ ${MEC[$SLOT_ID]} != 0 ]]
+	
+	if [[ ${MEC[$SLOT_ID]} != 0 ]] && [[ "${MEC[$SLOT_ID]}" -gt "${MEC_THRESHOLD}" ]]
 		then
 		WARN_DEVICES+="Slot# ${SLOT_ID}, Device# ${DEVICE_ID[$SLOT_ID]}, Sn# ${SN[$SLOT_ID]} has reported ${MEC[$SLOT_ID]} media errors, "
 	fi
