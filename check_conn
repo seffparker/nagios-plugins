@@ -2,7 +2,7 @@
 
 # Nagios/Icinga script to check and report active TCP connections to the server
 # Author: Seff P.
-# Version: 20210315
+# Version: 20210426
 
 MAIL_PORTS='110|143|993|995|25|26|465|587'
 HTTP_PORTS='80|443|8080|8443'
@@ -41,9 +41,9 @@ DB_COUNT=$(echo "$CONN_LIST" | awk {'print $4'} | cut -d':' -f2 | grep -cwP $DB_
 
 echo "Total TCP connections: $COUNT_ALL (ESTABLISHED=$COUNT_EST, TIME_WAIT=$COUNT_TW, HTTP=$HTTP_COUNT, MAIL=$MAIL_COUNT, DATABASE=$DB_COUNT) | ESTABLISHED=$COUNT_EST;;;; TIME_WAIT=$COUNT_TW;;;; HTTP=$HTTP_COUNT;;;; MAIL=$MAIL_COUNT;;;; DATABASE=$DB_COUNT;;;; TOTAL=$COUNT_ALL;$WARN;$CRIT;;"
 
-if [ $COUNT_ALL -lt $WARN ]
+if [ $COUNT_EST -lt $WARN ]
 	then exit 0; #OK
-elif [ $COUNT_ALL -lt $CRIT ]
+elif [ $COUNT_EST -lt $CRIT ]
 	then exit 1; #WARNING
 else
 	exit 2; #CRITICAL
